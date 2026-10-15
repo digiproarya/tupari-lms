@@ -129,6 +129,7 @@ export interface Question {
   correctAnswer?: string;
   points: number;
   order: number;
+  difficulty?: 'low' | 'medium' | 'high' | 'hots';
 }
 
 export interface Grade {

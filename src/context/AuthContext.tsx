@@ -1,64 +1,97 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { User, Role, Permission, ROLE_PERMISSIONS } from '../types';
-import { users, schools } from '../data/mockData';
+import { api } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   hasPermission: (permission: Permission) => boolean;
   switchSchool: (schoolId: string) => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
+  connectionStatus: 'connected' | 'disconnected' | 'checking';
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock password store (in real app, auth is handled by GAS backend)
-const MOCK_CREDENTIALS: Record<string, string> = {
-  'admin@tupari.id': 'admin123',
-  'budi@tupari.id': 'guru123',
-  'kepsek@tupari.id': 'kepsek123',
-  'ahmad@tupari.id': 'guru123',
-  'dewi@tupari.id': 'guru123',
-  'rizki@tupari.id': 'siswa123',
-  'anisa@tupari.id': 'siswa123',
-  'operator@tupari.id': 'operator123',
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem('tupari_user');
-    return stored ? JSON.parse(stored) : null;
+    try {
+      const stored = localStorage.getItem('tupari_user');
+      const token = localStorage.getItem('tupari_token');
+      if (stored && token) {
+        const parsed = JSON.parse(stored);
+        // TODO: Verify token validity with backend on app start
+        return parsed;
+      }
+    } catch (e) {
+      localStorage.removeItem('tupari_user');
+      localStorage.removeItem('tupari_token');
+    }
+    return null;
   });
 
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const expectedPassword = MOCK_CREDENTIALS[email];
-    if (!expectedPassword || expectedPassword !== password) {
-      return false;
-    }
+  const [isLoading, setIsLoading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
 
-    const foundUser = users.find(u => u.email === email);
-    if (!foundUser || foundUser.status !== 'active') {
-      return false;
+  const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    setIsLoading(true);
+    try {
+      // Panggil API GAS untuk login
+      const response = await api.auth.login(email, password);
+      
+      if (response.success && response.data) {
+        const { token, user: userData } = response.data;
+        
+        // Simpan token & user
+        localStorage.setItem('tupari_token', token);
+        localStorage.setItem('tupari_user', JSON.stringify(userData));
+        
+        setUser(userData);
+        setConnectionStatus('connected');
+        
+        return { success: true };
+      } else {
+        // Login gagal - tampilkan error dari backend
+        return { 
+          success: false, 
+          error: response.error || 'Email atau password salah' 
+        };
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setConnectionStatus('disconnected');
+      return { 
+        success: false, 
+        error: 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.' 
+      };
+    } finally {
+      setIsLoading(false);
     }
-
-    setUser(foundUser);
-    localStorage.setItem('tupari_user', JSON.stringify(foundUser));
-    return true;
   }, []);
 
-  const logout = useCallback(() => {
-    setUser(null);
-    localStorage.removeItem('tupari_user');
+  const logout = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('tupari_token');
+      if (token) {
+        // Notify backend tentang logout (fire-and-forget)
+        api.auth.logout(token).catch(() => {});
+      }
+    } catch (e) {
+      // Ignore logout errors
+    } finally {
+      setUser(null);
+      localStorage.removeItem('tupari_user');
+      localStorage.removeItem('tupari_token');
+      setConnectionStatus('disconnected');
+    }
   }, []);
 
   const hasPermission = useCallback((permission: Permission): boolean => {
     if (!user) return false;
-    const userPermissions = ROLE_PERMISSIONS[user.role];
-    return userPermissions.includes(permission);
+    const userPermissions = ROLE_PERMISSIONS[user.role as Role];
+    return userPermissions ? userPermissions.includes(permission) : false;
   }, [user]);
 
   const switchSchool = useCallback((schoolId: string) => {
@@ -77,6 +110,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasPermission,
       switchSchool,
       isAuthenticated: !!user,
+      isLoading,
+      connectionStatus,
     }}>
       {children}
     </AuthContext.Provider>

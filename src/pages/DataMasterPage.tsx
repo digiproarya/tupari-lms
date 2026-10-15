@@ -1,50 +1,119 @@
-import React, { useState } from 'react';
-import { students, classes, subjects, schools, academicPeriods } from '../data/mockData';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Search, Plus, Download, Upload, Edit2, Trash2, Eye, Filter, Users, BookOpen, GraduationCap } from 'lucide-react';
+import { api } from '../services/api';
+import { Search, Plus, Download, Upload, Edit2, Trash2, Eye, Filter, Users, BookOpen, GraduationCap, Loader2, AlertCircle, Database } from 'lucide-react';
+import type { Student, Class, Subject } from '../types';
 
-type Tab = 'siswa' | 'kelas' | 'mapel' | 'sekolah' | 'periode';
+type Tab = 'siswa' | 'kelas' | 'mapel';
 
 export default function DataMasterPage() {
   const { user, hasPermission } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('siswa');
   const [search, setSearch] = useState('');
+  
+  const [students, setStudents] = useState<Student[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'siswa', label: 'Siswa', icon: <Users size={16} /> },
-    { id: 'kelas', label: 'Kelas', icon: <BookOpen size={16} /> },
-    { id: 'mapel', label: 'Mata Pelajaran', icon: <GraduationCap size={16} /> },
-    { id: 'sekolah', label: 'Sekolah', icon: <GraduationCap size={16} /> },
-    { id: 'periode', label: 'Periode Akademik', icon: <GraduationCap size={16} /> },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.activeSchoolId) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const [studentsData, classesData, subjectsData] = await Promise.all([
+          api.students.getAll(user.activeSchoolId) as Promise<Student[] | null>,
+          api.classes.getAll(user.activeSchoolId) as Promise<Class[] | null>,
+          api.subjects.getAll(user.activeSchoolId) as Promise<Subject[] | null>,
+        ]);
+        
+        if (studentsData) setStudents(studentsData);
+        if (classesData) setClasses(classesData);
+        if (subjectsData) setSubjects(subjectsData);
+      } catch (err) {
+        setError('Gagal memuat data. Pastikan backend GAS sudah terhubung.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [user?.activeSchoolId]);
 
   const filteredStudents = students.filter(s => 
-    s.schoolId === user?.activeSchoolId && 
-    (s.name.toLowerCase().includes(search.toLowerCase()) || s.nis.includes(search))
+    s.name.toLowerCase().includes(search.toLowerCase()) || s.nis.includes(search)
   );
 
   const filteredClasses = classes.filter(c => 
-    c.schoolId === user?.activeSchoolId && 
     c.name.toLowerCase().includes(search.toLowerCase())
   );
 
   const filteredSubjects = subjects.filter(s => 
-    s.schoolId === user?.activeSchoolId && 
     s.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const tabs: { id: Tab; label: string; icon: React.ReactNode; count: number }[] = [
+    { id: 'siswa', label: 'Siswa', icon: <Users size={16} />, count: students.length },
+    { id: 'kelas', label: 'Kelas', icon: <BookOpen size={16} />, count: classes.length },
+    { id: 'mapel', label: 'Mata Pelajaran', icon: <GraduationCap size={16} />, count: subjects.length },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 size={48} className="animate-spin text-primary-600 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Memuat data dari Google Sheets...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center max-w-md">
+          <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
+          <p className="text-gray-900 dark:text-white font-medium mb-2">Gagal Memuat Data</p>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Data Master</h1>
-          <p className="text-gray-500 dark:text-gray-400">Kelola data utama sistem pembelajaran</p>
+          <p className="text-gray-500 dark:text-gray-400">Data real dari Google Sheets Anda</p>
         </div>
         {hasPermission('user.create') && (
           <button className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
             <Plus size={18} /> Tambah Data
           </button>
         )}
+      </div>
+
+      {/* Info Banner */}
+      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 mb-6">
+        <div className="flex items-center gap-2">
+          <Database size={18} className="text-green-600 dark:text-green-400" />
+          <p className="text-sm text-green-800 dark:text-green-400">
+            ✅ Terhubung ke Google Sheets — {students.length} siswa, {classes.length} kelas, {subjects.length} mata pelajaran
+          </p>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -59,7 +128,7 @@ export default function DataMasterPage() {
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
-            {tab.icon} {tab.label}
+            {tab.icon} {tab.label} ({tab.count})
           </button>
         ))}
       </div>
@@ -82,11 +151,6 @@ export default function DataMasterPage() {
         <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
           <Download size={16} /> Ekspor
         </button>
-        {hasPermission('user.create') && (
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
-            <Upload size={16} /> Impor
-          </button>
-        )}
       </div>
 
       {/* Content */}
@@ -106,37 +170,41 @@ export default function DataMasterPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredStudents.map(student => (
-                  <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{student.nis}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{student.nisn}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{student.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
-                      {classes.find(c => c.id === student.classId)?.name || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{student.gender}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 text-xs rounded-full ${
-                        student.status === 'active' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                      }`}>{student.status === 'active' ? 'Aktif' : 'Nonaktif'}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"><Eye size={14} /></button>
-                        {hasPermission('user.update') && <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-500"><Edit2 size={14} /></button>}
-                        {hasPermission('user.delete') && <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500"><Trash2 size={14} /></button>}
-                      </div>
+                {filteredStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                      <Users size={40} className="mx-auto mb-3 opacity-50" />
+                      <p>Belum ada data siswa di Google Sheets</p>
+                      <p className="text-sm mt-1">Tambahkan data siswa di sheet STUDENTS</p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredStudents.map(student => (
+                    <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{student.nis}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{student.nisn}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{student.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                        {classes.find(c => c.id === student.classId)?.name || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{student.gender}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 text-xs rounded-full ${
+                          student.status === 'active' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                        }`}>{student.status === 'active' ? 'Aktif' : 'Nonaktif'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"><Eye size={14} /></button>
+                          {hasPermission('user.update') && <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-500"><Edit2 size={14} /></button>}
+                          {hasPermission('user.delete') && <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500"><Trash2 size={14} /></button>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
-            {filteredStudents.length === 0 && (
-              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                <Users size={40} className="mx-auto mb-3 opacity-50" />
-                <p>Tidak ada data siswa ditemukan</p>
-              </div>
-            )}
           </div>
         )}
 
@@ -147,28 +215,33 @@ export default function DataMasterPage() {
                 <tr>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nama Kelas</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tingkat</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Wali Kelas</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Jumlah Siswa</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredClasses.map(cls => (
-                  <tr key={cls.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{cls.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">Kelas {cls.grade}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
-                      {students.find(s => s.id === cls.homeroomTeacherId)?.name || 'Belum ditugaskan'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{cls.studentCount} siswa</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"><Eye size={14} /></button>
-                        <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-500"><Edit2 size={14} /></button>
-                      </div>
+                {filteredClasses.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                      <BookOpen size={40} className="mx-auto mb-3 opacity-50" />
+                      <p>Belum ada data kelas di Google Sheets</p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredClasses.map(cls => (
+                    <tr key={cls.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{cls.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">Kelas {cls.grade}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{cls.studentCount} siswa</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"><Eye size={14} /></button>
+                          <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-500"><Edit2 size={14} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -186,64 +259,27 @@ export default function DataMasterPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredSubjects.map(sub => (
-                  <tr key={sub.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                    <td className="px-4 py-3 text-sm font-mono text-gray-600 dark:text-gray-300">{sub.code}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{sub.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">Kelas {sub.grade}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-500"><Edit2 size={14} /></button>
-                      </div>
+                {filteredSubjects.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                      <GraduationCap size={40} className="mx-auto mb-3 opacity-50" />
+                      <p>Belum ada data mata pelajaran di Google Sheets</p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredSubjects.map(sub => (
+                    <tr key={sub.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                      <td className="px-4 py-3 text-sm font-mono text-gray-600 dark:text-gray-300">{sub.code}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{sub.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">Kelas {sub.grade}</td>
+                      <td className="px-4 py-3">
+                        <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-500"><Edit2 size={14} /></button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {activeTab === 'sekolah' && (
-          <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {schools.map(school => (
-              <div key={school.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                    <GraduationCap size={20} className="text-primary-600 dark:text-primary-400" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 dark:text-white text-sm">{school.name}</h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">NPSN: {school.npsn}</p>
-                  </div>
-                </div>
-                <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                  <p>{school.address}</p>
-                  <p>Jenjang: {school.level}</p>
-                  <p>Kurikulum: {school.curriculum}</p>
-                  <p>TA: {school.academicYear} - Sem {school.semester}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'periode' && (
-          <div className="p-4 space-y-3">
-            {academicPeriods.filter(p => p.schoolId === user?.activeSchoolId).map(period => (
-              <div key={period.id} className={`border rounded-lg p-4 ${period.isActive ? 'border-primary-300 dark:border-primary-700 bg-primary-50 dark:bg-primary-900/10' : 'border-gray-200 dark:border-gray-700'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-gray-900 dark:text-white">{period.name}</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      {new Date(period.startDate).toLocaleDateString('id-ID')} - {new Date(period.endDate).toLocaleDateString('id-ID')}
-                    </p>
-                  </div>
-                  {period.isActive && (
-                    <span className="px-3 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">Aktif</span>
-                  )}
-                </div>
-              </div>
-            ))}
           </div>
         )}
       </div>

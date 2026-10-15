@@ -1,65 +1,122 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { students, classes, materials, assignments, exams, attendance, grades, notifications, auditLogs, subjects } from '../data/mockData';
-import { Users, BookOpen, ClipboardList, GraduationCap, UserCheck, TrendingUp, Bell, Clock, AlertTriangle, CheckCircle2, BarChart3, FileText } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { api } from '../services/api';
+import { Users, BookOpen, ClipboardList, GraduationCap, UserCheck, TrendingUp, Bell, Clock, CheckCircle2, BarChart3, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import type { Student, Class, Material, Assignment, Exam, Attendance, Grade } from '../types';
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  
+  // State untuk data real dari API
+  const [students, setStudents] = useState<Student[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch data dari API
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.activeSchoolId) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch data secara paralel
+        const [studentsData, classesData] = await Promise.all([
+          api.students.getAll(user.activeSchoolId) as Promise<Student[] | null>,
+          api.classes.getAll(user.activeSchoolId) as Promise<Class[] | null>,
+        ]);
+        
+        if (studentsData) setStudents(studentsData);
+        if (classesData) setClasses(classesData);
+        
+        // Note: materials, assignments, exams akan ditambahkan setelah endpoint tersedia di backend
+        // Untuk sekarang, gunakan array kosong
+        setMaterials([]);
+        setAssignments([]);
+      } catch (err) {
+        console.error('Error fetching dashboard ', err);
+        setError('Gagal memuat data dashboard');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [user?.activeSchoolId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 size={48} className="animate-spin text-primary-600 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Memuat dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center max-w-md">
+          <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
+          <p className="text-gray-900 dark:text-white font-medium mb-2">Gagal Memuat Dashboard</p>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) return null;
 
-  const classStudents = students.filter(s => s.schoolId === user.activeSchoolId);
-  const schoolClasses = classes.filter(c => c.schoolId === user.activeSchoolId);
-  const schoolMaterials = materials.filter(m => m.status === 'published');
-  const activeAssignments = assignments.filter(a => a.status === 'active');
-  const activeExams = exams.filter(e => e.status === 'active');
-  const unreadNotifs = notifications.filter(n => !n.read && n.userId === user.id);
-
-  // Stats
-  const totalStudents = classStudents.length;
-  const totalClasses = schoolClasses.length;
-  const totalMaterials = schoolMaterials.length;
-  const pendingSubmissions = assignments.reduce((acc, a) => acc + a.submissions.filter(s => s.status === 'pending').length, 0);
+  // Calculate stats dari data real
+  const totalStudents = students.length;
+  const totalClasses = classes.length;
+  const totalMaterials = materials.length;
+  const activeAssignments = assignments.filter(a => a.status === 'active').length;
   
-  // Attendance stats
-  const todayAttendance = attendance.filter(a => a.date === '2025-02-18');
-  const hadirCount = todayAttendance.filter(a => a.status === 'hadir').length;
-  const sakitCount = todayAttendance.filter(a => a.status === 'sakit').length;
-  const izinCount = todayAttendance.filter(a => a.status === 'izin').length;
-  const alpaCount = todayAttendance.filter(a => a.status === 'alpa').length;
+  // Attendance stats (placeholder - akan diisi setelah attendance API siap)
+  const hadirCount = 0;
+  const sakitCount = 0;
+  const izinCount = 0;
+  const alpaCount = 0;
 
-  // Grade distribution
+  // Grade distribution (placeholder)
   const gradeDistribution = [
-    { name: '≥90', value: grades.filter(g => g.score >= 90).length, color: '#22c55e' },
-    { name: '80-89', value: grades.filter(g => g.score >= 80 && g.score < 90).length, color: '#3b82f6' },
-    { name: '70-79', value: grades.filter(g => g.score >= 70 && g.score < 80).length, color: '#f59e0b' },
-    { name: '<70', value: grades.filter(g => g.score < 70).length, color: '#ef4444' },
+    { name: '≥90', value: 0, color: '#22c55e' },
+    { name: '80-89', value: 0, color: '#3b82f6' },
+    { name: '70-79', value: 0, color: '#f59e0b' },
+    { name: '<70', value: 0, color: '#ef4444' },
   ];
 
-  // Weekly activity
+  // Weekly activity (placeholder)
   const weeklyActivity = [
-    { day: 'Sen', materi: 2, tugas: 1, ujian: 0 },
-    { day: 'Sel', materi: 1, tugas: 2, ujian: 0 },
-    { day: 'Rab', materi: 3, tugas: 0, ujian: 1 },
-    { day: 'Kam', materi: 1, tugas: 1, ujian: 0 },
-    { day: 'Jum', materi: 2, tugas: 3, ujian: 0 },
-    { day: 'Sab', materi: 0, tugas: 0, ujian: 1 },
+    { day: 'Sen', materi: 0, tugas: 0, ujian: 0 },
+    { day: 'Sel', materi: 0, tugas: 0, ujian: 0 },
+    { day: 'Rab', materi: 0, tugas: 0, ujian: 0 },
+    { day: 'Kam', materi: 0, tugas: 0, ujian: 0 },
+    { day: 'Jum', materi: 0, tugas: 0, ujian: 0 },
+    { day: 'Sab', materi: 0, tugas: 0, ujian: 0 },
   ];
-
-  // Subject performance
-  const subjectPerformance = subjects.slice(0, 5).map(sb => {
-    const subjectGrades = grades.filter(g => g.subjectId === sb.id);
-    const avg = subjectGrades.length > 0 ? Math.round(subjectGrades.reduce((a, g) => a + g.score, 0) / subjectGrades.length) : 0;
-    return { name: sb.code, avg };
-  });
 
   const statCards = [
-    { label: 'Total Siswa', value: totalStudents, icon: <Users size={22} />, color: 'bg-blue-500', trend: '+12' },
-    { label: 'Total Kelas', value: totalClasses, icon: <BookOpen size={22} />, color: 'bg-emerald-500', trend: '5 rombel' },
-    { label: 'Materi Aktif', value: totalMaterials, icon: <FileText size={22} />, color: 'bg-purple-500', trend: '+3 minggu ini' },
-    { label: 'Tugas Aktif', value: activeAssignments.length, icon: <ClipboardList size={22} />, color: 'bg-amber-500', trend: `${pendingSubmissions} blm dikumpulkan` },
-    { label: 'Ujian Aktif', value: activeExams.length, icon: <GraduationCap size={22} />, color: 'bg-rose-500', trend: '1 minggu ini' },
-    { label: 'Kehadiran Hari Ini', value: `${totalStudents > 0 ? Math.round((hadirCount / Math.max(todayAttendance.length, 1)) * 100) : 0}%`, icon: <UserCheck size={22} />, color: 'bg-teal-500', trend: `${hadirCount} hadir` },
+    { label: 'Total Siswa', value: totalStudents, icon: <Users size={22} />, color: 'bg-blue-500', trend: `${totalStudents} siswa aktif` },
+    { label: 'Total Kelas', value: totalClasses, icon: <BookOpen size={22} />, color: 'bg-emerald-500', trend: `${totalClasses} rombel` },
+    { label: 'Materi Aktif', value: totalMaterials, icon: <FileText size={22} />, color: 'bg-purple-500', trend: 'dari Google Sheets' },
+    { label: 'Tugas Aktif', value: activeAssignments, icon: <ClipboardList size={22} />, color: 'bg-amber-500', trend: 'perlu ditindaklanjuti' },
+    { label: 'Ujian Aktif', value: 0, icon: <GraduationCap size={22} />, color: 'bg-rose-500', trend: 'minggu ini' },
+    { label: 'Kehadiran', value: '—', icon: <UserCheck size={22} />, color: 'bg-teal-500', trend: 'data presensi' },
   ];
 
   return (
@@ -70,7 +127,7 @@ export default function DashboardPage() {
           Selamat Datang, {user.name.split(',')[0]} 👋
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Berikut ringkasan aktivitas pembelajaran hari ini
+          Dashboard dengan data real dari Google Sheets Anda
         </p>
       </div>
 
@@ -89,6 +146,20 @@ export default function DashboardPage() {
             <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">{card.trend}</p>
           </div>
         ))}
+      </div>
+
+      {/* Info Banner */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6">
+        <div className="flex items-start gap-3">
+          <CheckCircle2 size={20} className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-medium text-blue-900 dark:text-blue-300 mb-1">Data Terhubung ke Google Sheets</h3>
+            <p className="text-sm text-blue-800 dark:text-blue-400">
+              Dashboard ini menampilkan data real dari Google Sheets Anda. 
+              Total {totalStudents} siswa dan {totalClasses} kelas terdeteksi.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Charts Row */}
@@ -127,101 +198,25 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Subject Performance & Attendance */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Subject Performance */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Rata-rata Nilai per Mapel</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={subjectPerformance} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 12 }} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={40} />
-              <Tooltip />
-              <Bar dataKey="avg" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Rata-rata" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Attendance Summary */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Rekap Presensi Hari Ini</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-green-700 dark:text-green-400">{hadirCount}</p>
-              <p className="text-xs text-green-600 dark:text-green-400">Hadir</p>
-            </div>
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">{sakitCount}</p>
-              <p className="text-xs text-yellow-600 dark:text-yellow-400">Sakit</p>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{izinCount}</p>
-              <p className="text-xs text-blue-600 dark:text-blue-400">Izin</p>
-            </div>
-            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-red-700 dark:text-red-400">{alpaCount}</p>
-              <p className="text-xs text-red-600 dark:text-red-400">Alpa</p>
-            </div>
+      {/* Attendance Summary */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Rekap Presensi Hari Ini</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-green-700 dark:text-green-400">{hadirCount}</p>
+            <p className="text-xs text-green-600 dark:text-green-400">Hadir</p>
           </div>
-        </div>
-      </div>
-
-      {/* Bottom Row: Notifications & Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Notifications */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <Bell size={18} /> Notifikasi
-            </h3>
-            {unreadNotifs.length > 0 && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full">
-                {unreadNotifs.length} baru
-              </span>
-            )}
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">{sakitCount}</p>
+            <p className="text-xs text-yellow-600 dark:text-yellow-400">Sakit</p>
           </div>
-          <div className="space-y-3">
-            {notifications.slice(0, 5).map(n => (
-              <div key={n.id} className={`flex items-start gap-3 p-3 rounded-lg ${n.read ? 'bg-gray-50 dark:bg-gray-700/50' : 'bg-primary-50 dark:bg-primary-900/20'}`}>
-                <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                  n.type === 'info' ? 'bg-blue-500' :
-                  n.type === 'warning' ? 'bg-amber-500' :
-                  n.type === 'success' ? 'bg-green-500' : 'bg-red-500'
-                }`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{n.title}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{n.message}</p>
-                </div>
-              </div>
-            ))}
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{izinCount}</p>
+            <p className="text-xs text-blue-600 dark:text-blue-400">Izin</p>
           </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
-            <Clock size={18} /> Aktivitas Terbaru
-          </h3>
-          <div className="space-y-3">
-            {auditLogs.slice(0, 5).map(log => (
-              <div key={log.id} className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                    {log.userName.charAt(0)}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-900 dark:text-white">
-                    <span className="font-medium">{log.userName.split(',')[0]}</span>
-                    {' '}{log.details.toLowerCase()}
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    {new Date(log.timestamp).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
-                  </p>
-                </div>
-              </div>
-            ))}
+          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-red-700 dark:text-red-400">{alpaCount}</p>
+            <p className="text-xs text-red-600 dark:text-red-400">Alpa</p>
           </div>
         </div>
       </div>

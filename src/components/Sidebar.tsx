@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Database, BookOpen, FileText, ClipboardList,
   BarChart3, Users, UserCheck, GraduationCap, FileBarChart,
   Link2, Shield, Settings, Activity, LogOut, ChevronLeft,
-  ChevronRight, Menu, School, Bell, Sparkles
+  ChevronRight, Menu, School, Bell, Sparkles, HelpCircle, ClipboardCheck, Home
 } from 'lucide-react';
 
 interface NavItem {
@@ -21,6 +21,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/dashboard', roles: ['super_admin', 'admin_sekolah', 'kepala_sekolah', 'guru', 'siswa', 'operator'] },
   { id: 'ai-generator', label: 'AI Generator', icon: <Sparkles size={20} />, path: '/ai-generator', roles: ['super_admin', 'admin_sekolah', 'guru'], badge: '✨' },
+  { id: 'content-studio', label: 'Content Studio', icon: <BookOpen size={20} />, path: '/content-studio', roles: ['super_admin', 'admin_sekolah', 'guru'], badge: 'NEW' },
   { id: 'data-master', label: 'Data Master', icon: <Database size={20} />, path: '/data-master', roles: ['super_admin', 'admin_sekolah', 'kepala_sekolah', 'operator'] },
   { id: 'perencanaan', label: 'Perencanaan', icon: <BookOpen size={20} />, path: '/perencanaan', roles: ['super_admin', 'admin_sekolah', 'guru'] },
   { id: 'materi', label: 'Materi', icon: <FileText size={20} />, path: '/materi', roles: ['super_admin', 'admin_sekolah', 'guru', 'siswa'] },
@@ -30,6 +31,9 @@ const navItems: NavItem[] = [
   { id: 'ujian', label: 'Ujian Online', icon: <GraduationCap size={20} />, path: '/ujian', roles: ['super_admin', 'admin_sekolah', 'guru', 'siswa'] },
   { id: 'cbt-exam', label: 'Kerjakan Ujian', icon: <GraduationCap size={20} />, path: '/cbt/exam', roles: ['siswa'] },
   { id: 'cbt-analysis', label: 'Analisis Soal', icon: <BarChart3 size={20} />, path: '/cbt/analysis', roles: ['super_admin', 'admin_sekolah', 'guru'] },
+  { id: 'bank-soal', label: 'Bank Soal', icon: <HelpCircle size={20} />, path: '/bank-soal', roles: ['super_admin', 'admin_sekolah', 'guru'] },
+  { id: 'rubrik', label: 'Rubrik Penilaian', icon: <ClipboardCheck size={20} />, path: '/rubrik', roles: ['super_admin', 'admin_sekolah', 'guru'] },
+  { id: 'portal', label: 'Portal Siswa', icon: <Home size={20} />, path: '/portal', roles: ['siswa'] },
   { id: 'telegram', label: 'Telegram Bot', icon: <Link2 size={20} />, path: '/telegram', roles: ['super_admin', 'admin_sekolah', 'guru'] },
   { id: 'siswa', label: 'Siswa', icon: <Users size={20} />, path: '/siswa', roles: ['super_admin', 'admin_sekolah', 'kepala_sekolah', 'guru', 'operator'] },
   { id: 'laporan', label: 'Laporan', icon: <FileBarChart size={20} />, path: '/laporan', roles: ['super_admin', 'admin_sekolah', 'kepala_sekolah', 'guru', 'operator'] },

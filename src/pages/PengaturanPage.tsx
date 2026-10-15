@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Settings, Moon, Sun, Bell, Shield, Database, Globe, Save } from 'lucide-react';
-import { schools } from '../data/mockData';
 
 export default function PengaturanPage() {
   const { user, hasPermission } = useAuth();
@@ -25,7 +24,6 @@ export default function PengaturanPage() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Sidebar */}
         <div className="lg:w-64 flex-shrink-0">
           <nav className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-2">
             {sections.map(s => (
@@ -39,7 +37,6 @@ export default function PengaturanPage() {
           </nav>
         </div>
 
-        {/* Content */}
         <div className="flex-1">
           {activeSection === 'umum' && (
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
@@ -136,16 +133,6 @@ export default function PengaturanPage() {
                 <button className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
                   <Shield size={16} /> Ubah Password
                 </button>
-                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <h4 className="font-medium text-gray-900 dark:text-white mb-3">Sesi Aktif</h4>
-                  <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">Perangkat ini</p>
-                      <p className="text-xs text-gray-500">Login terakhir: sekarang</p>
-                    </div>
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">Aktif</span>
-                  </div>
-                </div>
               </div>
             </div>
           )}

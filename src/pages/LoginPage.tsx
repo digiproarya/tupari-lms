@@ -23,11 +23,11 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const success = await login(email, password);
-      if (success) {
+      const result = await login(email, password);
+      if (result.success) {
         navigate('/dashboard');
       } else {
-        setError('Email atau password salah. Akun tidak aktif.');
+        setError(result.error || 'Email atau password salah.');
       }
     } catch {
       setError('Terjadi kesalahan. Silakan coba lagi.');
