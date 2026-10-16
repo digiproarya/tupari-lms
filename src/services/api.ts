@@ -140,6 +140,46 @@ async function fetchWithRetry<T>(
   return { success: false, error: 'Max retries exceeded', timestamp: Date.now() };
 }
 
+// ==================== PUBLIC TASK REQUESTS (NO STUDENT LOGIN) ====================
+// Public task endpoints deliberately omit the logged-in user's token.
+// Read requests may be retried; submission writes are sent once to avoid duplicates.
+async function publicTaskRequest<T>(
+  action: string,
+  payload: Record<string, any>,
+  retryRead = false
+): Promise<ApiResponse<T>> {
+  const attempts = retryRead ? 2 : 1;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const response = await fetch(CONFIG.GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, payload }),
+      });
+      if (!response.ok) {
+        return { success: false, error: `HTTP ${response.status}`, timestamp: Date.now() };
+      }
+      const result = await response.json();
+      return {
+        success: result.success === true,
+        data: result.data as T,
+        error: result.error,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      if (attempt === attempts) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Koneksi gagal',
+          timestamp: Date.now(),
+        };
+      }
+      await new Promise(resolve => setTimeout(resolve, 700 * attempt));
+    }
+  }
+  return { success: false, error: 'Permintaan gagal', timestamp: Date.now() };
+}
+
 // ==================== CACHE-AWARE READ ====================
 async function getCachedData<T>(
   cacheKey: string,
@@ -533,6 +573,22 @@ export const api = {
     },
     save: async (materialId: string, userId: string, content: string) => {
       return fetchWithRetry('saveComment', { materialId, userId, content }, { priority: 'high' });
+    },
+  },
+
+  // ---------- PUBLIC TASKS (NO STUDENT LOGIN) ----------
+  publicTasks: {
+    get: async (assignmentId: string, accessToken: string) => {
+      return publicTaskRequest('getPublicTask', { assignmentId, accessToken }, true);
+    },
+    submit: async (payload: {
+      assignmentId: string;
+      accessToken: string;
+      studentNis: string;
+      studentName: string;
+      content: string;
+    }) => {
+      return publicTaskRequest('submitPublicTask', payload, false);
     },
   },
 
