@@ -415,6 +415,13 @@ export const api = {
         options
       );
     },
+    create: async (data: any) => {
+      const result = await fetchWithRetry('createAssignment', data, { priority: 'high' });
+      if (result.success && data.classId) {
+        await db.delete('cache', `assignments_${data.classId}`);
+      }
+      return result;
+    },
     submit: async (assignmentId: string, studentId: string, data: any) => {
       return fetchWithRetry('submitAssignment', { assignmentId, studentId, ...data }, { priority: 'high' });
     },
