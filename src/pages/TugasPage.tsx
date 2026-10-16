@@ -281,6 +281,21 @@ export default function TugasPage() {
                         </div>
                         <p className="text-xs text-gray-500 mt-1">{stats.graded} dinilai</p>
                       </div>
+                      {assignment.publicToken && (
+                        <button
+                          onClick={async () => {
+                            const url = `${window.location.origin}${window.location.pathname}#/tugas-public/${encodeURIComponent(assignment.id)}?token=${encodeURIComponent(assignment.publicToken!)}`;
+                            try {
+                              await navigator.clipboard.writeText(url);
+                              alert('Tautan tugas berhasil disalin. Siswa dapat membukanya tanpa login.');
+                            } catch {
+                              window.prompt('Salin tautan tugas ini untuk dibagikan kepada siswa:', url);
+                            }
+                          }}
+                          className="px-3 py-1.5 text-sm border border-green-300 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
+                          Salin Tautan Siswa
+                        </button>
+                      )}
                       <button onClick={() => setSelectedAssignment(assignment.id)}
                         className="px-3 py-1.5 text-sm bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors">
                         Detail
