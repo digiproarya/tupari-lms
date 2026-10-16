@@ -281,15 +281,32 @@ export default function TugasPage() {
                         </div>
                         <p className="text-xs text-gray-500 mt-1">{stats.graded} dinilai</p>
                       </div>
-                      {assignment.publicToken && (
+                      {hasPermission('assignment.manage') && (
                         <button
                           onClick={async () => {
-                            const url = `${window.location.origin}${window.location.pathname}#/tugas-public/${encodeURIComponent(assignment.id)}?token=${encodeURIComponent(assignment.publicToken!)}`;
                             try {
-                              await navigator.clipboard.writeText(url);
-                              alert('Tautan tugas berhasil disalin. Siswa dapat membukanya tanpa login.');
-                            } catch {
-                              window.prompt('Salin tautan tugas ini untuk dibagikan kepada siswa:', url);
+                              let publicToken = assignment.publicToken;
+                              if (!publicToken) {
+                                const enabled = await api.assignments.enablePublicLink(assignment.id);
+                                if (!enabled.success || !enabled.data?.publicToken) {
+                                  alert('Tautan publik belum dapat dibuat: ' + (enabled.error || 'Backend Apps Script belum dipasang atau tugas tidak diizinkan.'));
+                                  return;
+                                }
+                                publicToken = enabled.data.publicToken;
+                                setAssignments(current => current.map(item =>
+                                  item.id === assignment.id ? { ...item, publicToken } : item
+                                ));
+                              }
+                              const url = `${window.location.origin}${window.location.pathname}#/tugas-public/${encodeURIComponent(assignment.id)}?token=${encodeURIComponent(publicToken)}`;
+                              try {
+                                await navigator.clipboard.writeText(url);
+                                alert('Tautan tugas berhasil disalin. Siswa dapat membukanya tanpa login.');
+                              } catch {
+                                window.prompt('Salin tautan tugas untuk dibagikan kepada siswa:', url);
+                              }
+                            } catch (error) {
+                              console.error('Public task link error:', error);
+                              alert('Tautan tugas belum dapat dibuat. Pastikan patch backend sudah dipasang.');
                             }
                           }}
                           className="px-3 py-1.5 text-sm border border-green-300 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
