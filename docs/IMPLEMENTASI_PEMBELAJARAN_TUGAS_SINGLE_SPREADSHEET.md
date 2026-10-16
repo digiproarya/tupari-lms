@@ -138,3 +138,13 @@ Temuan ini adalah audit statis berdasarkan cuplikan yang diberikan, bukan hasil 
 - Frontend publik menerima jawaban teks pada tahap pertama. Upload file publik belum diaktifkan.
 - Perubahan frontend berada pada branch fitur dan belum dibangun/diuji. Backend GAS masih memerlukan patch router dan modul PublicTasks, serta pemeriksaan header ASSIGNMENTS/SUBMISSIONS sebelum dipasang.
 - Jangan deploy atau mengubah spreadsheet produksi sampai pengujian negatif dan positif selesai.
+
+
+### Pekerjaan frontend akses tugas tanpa login (branch fitur, 2026-10-16)
+
+- Ditambahkan halaman publik `src/pages/PublicTaskPage.tsx` dengan URL berbasis assignmentId dan token akses, tanpa ProtectedLayout/login siswa. Form awal menerima NIS, nama, dan jawaban teks.
+- Ditambahkan API publik tanpa token sesi pada `src/services/api.ts`; permintaan pengumpulan dikirim satu kali agar kegagalan respons tidak otomatis menggandakan penulisan.
+- Ditambahkan route publik di `src/App.tsx`, field `publicToken` opsional pada tipe Assignment, dan tombol guru untuk meminta/membagikan tautan.
+- Daftar tugas frontend sekarang meminta filter schoolId dan memakai cache berbasis sekolah. Backend Assignments.getAssignments saat ini belum menerima filter schoolId pada cuplikan yang diperiksa; perubahan backend tersebut wajib dilakukan sebelum fitur ini berfungsi benar.
+- Tombol tautan memerlukan aksi terautentikasi `enablePublicTaskLink`; aksi ini belum ada di router GAS yang diserahkan. Endpoint publik getPublicTask dan submitPublicTask serta generator token juga belum dipasang ke GAS.
+- Belum ada build/typecheck atau pengujian runtime. Frontend dan dokumen patch berada di branch fitur saja; belum di-merge/deploy dan belum menyentuh spreadsheet produksi.
