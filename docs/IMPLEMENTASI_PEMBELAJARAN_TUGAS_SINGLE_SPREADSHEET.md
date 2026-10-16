@@ -129,3 +129,12 @@ Temuan ini adalah audit statis berdasarkan cuplikan router dan handler yang dibe
 - Sebelum membuat perubahan, periksa header nyata pada USERS, STUDENTS, CLASSES, serta fungsi pengelolaan akun. Jangan menambah kolom atau tab baru sampai kolom relasi yang ada dipastikan.
 
 Temuan ini adalah audit statis berdasarkan cuplikan yang diberikan, bukan hasil uji runtime. Tidak ada perubahan pada Apps Script atau spreadsheet produksi.
+
+### Ketentuan akses tugas tanpa login siswa (2026-10-16)
+
+- Siswa tidak diminta login kembali ke Tupari LMS untuk membuka dan mengumpulkan tugas. Guru membagikan tautan tugas khusus yang membawa token akses acak.
+- Halaman publik dibuat terpisah dari layout yang dilindungi login. Permintaan publik tidak mengirim token login guru; backend tetap wajib memvalidasi token tautan, status tugas, tenggat, dan kecocokan siswa dengan kelas.
+- Identitas yang diketik siswa tidak dianggap autentikasi kuat. NIS dan nama hanya cocokkan data kelas; untuk tugas berisiko tinggi, pertimbangkan kode unik per siswa tanpa login LMS.
+- Frontend publik menerima jawaban teks pada tahap pertama. Upload file publik belum diaktifkan.
+- Perubahan frontend berada pada branch fitur dan belum dibangun/diuji. Backend GAS masih memerlukan patch router dan modul PublicTasks, serta pemeriksaan header ASSIGNMENTS/SUBMISSIONS sebelum dipasang.
+- Jangan deploy atau mengubah spreadsheet produksi sampai pengujian negatif dan positif selesai.
