@@ -61,3 +61,33 @@ Tab tambahan baru hanya dibuat setelah implementasi backend dan header diperiksa
 ## Batasan saat ini
 
 Tab yang dilaporkan pengguna masih kosong. Karena itu, uji end-to-end menggunakan akun dan data nyata belum bisa disimpulkan. Kode EduTask yang diserahkan menggunakan banyak tab bernama seperti Tugas, Siswa, dan Pengumpulan, sedangkan Tupari LMS memakai ASSIGNMENTS, STUDENTS, dan SUBMISSIONS. Integrasi harus memetakan kedua skema ke satu sumber data, bukan menyalin database ke spreadsheet baru.
+
+## Temuan audit backend setelah pemeriksaan `modules.gs` (2026-10-16)
+
+Temuan berikut berasal dari cuplikan modul yang diberikan untuk diperiksa; belum merupakan pengujian langsung Apps Script.
+
+### MATERIALS
+- `getMaterials(params)` hanya memfilter berdasarkan `classId`, `subjectId`, dan `status`. Belum ada filter `schoolId` atau pemeriksaan akses pada cuplikan fungsi ini.
+- `createMaterial(data)` memerlukan `title`, `subjectId`, dan `classId`, lalu langsung menyimpan data melalui `Database.create`. Belum membuat enam tahap default.
+- `getMaterial(materialId)` dan `updateMaterial(materialId, data)` belum memperlihatkan validasi sekolah/kelas maupun otorisasi pemilik materi pada cuplikan yang tersedia.
+
+### ASSIGNMENTS dan SUBMISSIONS
+- `getAssignments(params)` hanya memfilter `classId`, `subjectId`, dan `status`; data pengumpulan belum digabungkan ke setiap tugas pada fungsi yang terlihat.
+- `createAssignment(data)` menyimpan tugas melalui `Database.create`. Notifikasi Telegram bersifat tambahan dan bukan bukti penyimpanan atau otorisasi.
+- `submitAssignment(payload)` dan `gradeSubmission(payload)` masih berupa stub `TODO`. Keduanya mengembalikan `success: true` tanpa menulis data. UI tidak boleh menampilkan konfirmasi bahwa pengumpulan atau penilaian benar-benar tersimpan sebelum implementasi persistensi tersedia.
+- Perutean yang diketahui memakai nama aksi berbeda untuk pengumpulan (`submitTask` dan `gradeSubmission`) dibandingkan nama metode modul (`submitAssignment` dan `gradeSubmission`). Periksa implementasi `UploadHandler` dan router sebelum menyatukan alur; jangan mengasumsikan kedua rute memiliki perilaku yang sama.
+
+### Kontrak frontend yang belum konsisten
+- Beberapa halaman meneruskan `user.activeSchoolId` ke API `getAll(...)`, sementara fungsi backend yang terlihat menafsirkan parameter sebagai `classId`. ID sekolah tidak boleh dipakai sebagai ID kelas.
+- Tugas yang ditampilkan membutuhkan data pengumpulan, tetapi kontrak `getAssignments` yang terlihat hanya mengembalikan baris tugas. Sumber data submission dan relasinya perlu ditetapkan sebelum statistik pengumpulan dianggap akurat.
+- Frontend mengirim `user.id` sebagai `studentId` saat siswa mengumpulkan tugas. Relasi akun `USERS` dengan `STUDENTS` belum dibuktikan; jangan menyamakan kedua ID tanpa pemetaan backend.
+- Fungsi `createAssignment` pada branch fitur belum boleh dianggap siap produksi sampai penyegaran daftar tugas, pemfilteran sekolah/kelas, dan validasi otorisasi backend diselesaikan.
+
+### Gerbang sebelum implementasi backend
+1. Periksa seluruh router `doGet`/`doPost`, `authenticatePostRequest`, `UploadHandler`, dan fungsi `Database` yang relevan.
+2. Pastikan nama tab dan header yang benar dari `CONFIG.SHEETS` serta spreadsheet yang sudah ada. Jangan menjalankan inisialisasi atau membuat tab sebelum pemeriksaan ini.
+3. Tetapkan pemetaan akun siswa ke `STUDENTS`, validasi akses guru/siswa di backend, serta aturan status draft/published/active.
+4. Implementasikan penyimpanan submission dan nilai yang nyata, termasuk validasi tugas, siswa, tenggat, izin revisi, batas skor, dan pencegahan duplikasi sesuai kebijakan produk.
+5. Tambahkan penyimpanan enam tahap dan progres per siswa pada spreadsheet yang sama hanya setelah skema final ditinjau.
+6. Uji dengan data uji terpisah dari data produksi; lakukan build frontend dan uji langsung GAS sebelum menyatakan fitur siap.
+
