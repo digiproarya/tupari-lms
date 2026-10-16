@@ -29,6 +29,7 @@ import BankSoalPage from './pages/BankSoalPage';
 import RubrikPage from './pages/RubrikPage';
 import StudentPortalPage from './pages/StudentPortalPage';
 import ContentStudioPage from './pages/ContentStudioPage';
+import PublicTaskPage from './pages/PublicTaskPage';
 
 function ProtectedLayout() {
   const { isAuthenticated } = useAuth();
@@ -54,6 +55,8 @@ function AppRoutes() {
 
   return (
     <Routes>
+      {/* Public task link: students can submit without logging in */}
+      <Route path="/tugas-public/:assignmentId" element={<PublicTaskPage />} />
       <Route path="/login" element={
         isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />
       } />
