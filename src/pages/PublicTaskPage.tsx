@@ -116,8 +116,9 @@ export default function PublicTaskPage() {
           <label className="block"><span className="block text-sm font-medium mb-1">Nama siswa</span><input value={studentName} onChange={e => setStudentName(e.target.value)} autoComplete="name" required maxLength={120} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:ring-2 focus:ring-primary-500 outline-none" /></label>
           <label className="block"><span className="block text-sm font-medium mb-1">Jawaban / isi tugas</span><textarea value={content} onChange={e => setContent(e.target.value)} required rows={8} maxLength={30000} placeholder="Tuliskan jawaban di sini..." className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:ring-2 focus:ring-primary-500 outline-none resize-y" /><span className="text-xs text-gray-500">{content.length}/30000 karakter</span></label>
           {error && <div role="alert" className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>}
-          <button type="submit" disabled={submitting || !assignment || assignment.status !== 'active'} className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold px-4 py-3"><Send size={17} />{submitting ? 'Mengirim...' : 'Kumpulkan Tugas'}</button>
+          <button type="submit" disabled={submitting || !assignment || assignment.status !== 'active' || overdue} className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold px-4 py-3"><Send size={17} />{submitting ? 'Mengirim...' : 'Kumpulkan Tugas'}</button>
           {assignment?.status !== 'active' && <p className="text-sm text-amber-700">Tugas belum aktif atau sudah ditutup.</p>}
+          {overdue && <p className="text-sm text-red-700">Tenggat tugas telah lewat. Hubungi guru jika memerlukan perpanjangan.</p>}
         </form>
         <p className="text-xs text-center text-gray-500 mt-5">Jangan bagikan tautan akses tugas ke orang di luar kelas.</p>
       </div>
