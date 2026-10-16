@@ -105,3 +105,15 @@ Temuan berikut berasal dari cuplikan modul yang diberikan untuk diperiksa; belum
 - Penilaian pada `UploadHandler.gradeSubmission()` tetap perlu validasi nilai numerik dan rentang skor, serta penanganan bila update SUBMISSIONS berhasil tetapi pembuatan GRADES gagal. Hal ini belum dapat diperbaiki dengan aman hanya dari modul CRUD tanpa melihat router, skema, dan pola transaksi yang tersedia.
 
 Temuan di atas merupakan audit statis atas cuplikan kode, bukan bukti uji runtime. Belum ada perubahan pada Apps Script, spreadsheet, branch utama, atau deployment produksi.
+### Temuan audit router utama setelah cuplikan doGet/doPost diberikan (2026-10-16)
+
+- `doPost` menambahkan `payload.user = authResult.user` untuk aksi yang memerlukan autentikasi, tetapi router tetap meneruskan aksi ke handler tanpa pemeriksaan peran/kelas yang terlihat secara eksplisit. Pemeriksaan mungkin ada di handler; perlu diverifikasi sebelum menyimpulkan akses tidak terlindungi.
+- `submitTask` memanggil `UploadHandler.submitAssignment(assignmentId, studentId, content, fileUrl)`, sedangkan `submitAssignment` memanggil `Assignments.submitAssignment(payload)` yang diketahui masih berupa stub `TODO`. Frontend harus menggunakan aksi yang sesuai dengan handler persistensi nyata.
+- `gradeSubmission` memanggil `UploadHandler.gradeSubmission(submissionId, score, feedback)`, sedangkan `gradeAssignment` memanggil `Assignments.gradeSubmission(payload)` yang diketahui masih berupa stub. Kedua aksi tidak boleh dipertukarkan.
+- `getMaterials`, `getMaterial`, `getAssignments`, `getAssignment`, `getStudentGrades`, `getClassGrades`, `getAttendance`, dan sejumlah endpoint lain hanya melakukan autentikasi umum di router pada cuplikan yang tersedia; cakupan data per sekolah/kelas/siswa harus diverifikasi di handler.
+- `getExam` meneruskan `params.userRole`, tetapi cuplikan router tidak memperlihatkan bahwa `userRole` berasal dari identitas hasil autentikasi, bukan parameter permintaan. Ini perlu diperiksa untuk memastikan penghapusan correctAnswer bagi siswa tidak bergantung pada nilai yang bisa dikirim klien.
+- `authenticateRequest` dan `authenticatePostRequest` mengambil token dari parameter/body atau `e.headers['Authorization']`. Ketersediaan `e.headers` di lingkungan Apps Script Web App perlu diuji; pola akses header tidak boleh diasumsikan tersedia tanpa verifikasi runtime.
+- `doPost` menulis audit log untuk aksi terautentikasi, tetapi audit log tidak menggantikan validasi otorisasi. Detail payload juga diserialisasi ke log (dibatasi 500 karakter); periksa agar tidak mencatat token, kredensial, atau data sensitif.
+- Fungsi `testLogin()` memuat kredensial contoh yang ditulis langsung di source. Jangan gunakan atau memublikasikan kredensial tersebut; pastikan akun contoh tidak aktif/berhak akses di deployment nyata.
+
+Temuan ini adalah audit statis berdasarkan cuplikan router dan handler yang diberikan. Belum ada permintaan API atau pengujian langsung ke deployment.
