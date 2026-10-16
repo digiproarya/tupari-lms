@@ -447,18 +447,18 @@ export const api = {
 
   // ---------- ASSIGNMENTS ----------
   assignments: {
-    getAll: async (classId: string, options: RequestOptions = {}) => {
+    getAll: async (schoolId: string, options: RequestOptions = {}) => {
       return getCachedData(
-        `assignments_${classId}`,
-        () => fetchWithRetry('getAssignments', { classId }),
+        `assignments_school_${schoolId}`,
+        () => fetchWithRetry('getAssignments', { schoolId }),
         CONFIG.CACHE_TTL.assignments,
         options
       );
     },
     create: async (data: any) => {
       const result = await fetchWithRetry('createAssignment', data, { priority: 'high' });
-      if (result.success && data.classId) {
-        await db.delete('cache', `assignments_${data.classId}`);
+      if (result.success && data.schoolId) {
+        await db.delete('cache', `assignments_school_${data.schoolId}`);
       }
       return result;
     },
