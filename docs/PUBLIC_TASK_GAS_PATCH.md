@@ -179,3 +179,16 @@ Aksi ini tidak memerlukan sesi login, tetapi setiap permintaan tetap memvalidasi
 6. Jangan mengubah deployment produksi sebelum pengujian lolos dan disetujui.
 
 **Penting:** frontend branch sudah disiapkan untuk memanggil getPublicTask dan submitPublicTask, tetapi fitur belum berfungsi sampai patch Apps Script dipasang dan diuji. Dokumen ini bukan bukti backend sudah terpasang.
+
+
+## 5. Endpoint tambahan yang dipakai tombol guru
+
+Tombol Salin Tautan Siswa pada frontend memanggil aksi terautentikasi `enablePublicTaskLink`. Aksi ini belum tersedia di router yang saat ini diserahkan. Sebelum tombol tersebut berfungsi, tambahkan handler backend yang:
+
+- hanya mengizinkan guru pemilik tugas atau admin yang berwenang;
+- memastikan tugas dan kelas valid serta berasal dari sekolah yang sesuai;
+- membuat token acak di backend dan menyimpannya pada kolom `publicToken` di sheet ASSIGNMENTS yang sama;
+- mengembalikan `{ success: true, data: { publicToken: "..." } }` hanya kepada pemanggil berwenang;
+- tidak memasukkan aksi ini ke daftar `publicActions` karena pembuatan tautan membutuhkan autentikasi guru.
+
+Jangan menganggap tombol berbagi siap dipakai sampai handler ini ditambahkan dan diuji. Untuk tugas lama, token dapat dibuat saat guru meminta tautan; untuk tugas baru, token juga dapat dibuat saat pembuatan tugas. Kedua jalur harus memakai generator token backend yang sama.
