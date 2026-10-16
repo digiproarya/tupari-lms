@@ -117,3 +117,15 @@ Temuan di atas merupakan audit statis atas cuplikan kode, bukan bukti uji runtim
 - Fungsi `testLogin()` memuat kredensial contoh yang ditulis langsung di source. Jangan gunakan atau memublikasikan kredensial tersebut; pastikan akun contoh tidak aktif/berhak akses di deployment nyata.
 
 Temuan ini adalah audit statis berdasarkan cuplikan router dan handler yang diberikan. Belum ada permintaan API atau pengujian langsung ke deployment.
+### Temuan audit Students, Classes, dan Subjects (2026-10-16)
+
+- `Students.getStudents(params)` memfilter data berdasarkan schoolId/classId/status dan teks pencarian, tetapi fungsi ini sendiri tidak memeriksa apakah `params.user` berhak mengakses sekolah/kelas yang diminta.
+- Pencarian mengasumsikan `name`, `nis`, dan `nisn` memiliki nilai string. Nilai kosong atau tipe non-string dapat memicu error pada `toLowerCase()` atau `includes()`; pertimbangkan normalisasi aman setelah skema data diverifikasi.
+- `Students.getStudent(studentId)` mengambil rekaman hanya berdasarkan ID tanpa pemeriksaan cakupan sekolah/kelas di fungsi yang terlihat.
+- `Students.createStudent()` memeriksa NIS duplikat dalam sekolah yang sama, tetapi `updateStudent()` dan `bulkImport()` tidak memperlihatkan validasi serupa, validasi kelas milik sekolah tersebut, atau pemeriksaan otorisasi.
+- `Classes.getClasses()` memfilter schoolId dan grade, tetapi `getClass()`, `createClass()`, dan `updateClass()` belum menunjukkan pemeriksaan otorisasi atau validasi bahwa kelas dan sekolah konsisten.
+- `Subjects.getSubjects()` memfilter schoolId dan grade, tetapi cuplikan tidak menunjukkan pemeriksaan hak akses pengguna.
+- Tidak ada kolom/relasi akun-ke-siswa yang tampak pada modul Students yang diberikan. Relasi USERS→STUDENTS masih belum diketahui; jangan menganggap user.id sama dengan student.id.
+- Sebelum membuat perubahan, periksa header nyata pada USERS, STUDENTS, CLASSES, serta fungsi pengelolaan akun. Jangan menambah kolom atau tab baru sampai kolom relasi yang ada dipastikan.
+
+Temuan ini adalah audit statis berdasarkan cuplikan yang diberikan, bukan hasil uji runtime. Tidak ada perubahan pada Apps Script atau spreadsheet produksi.
