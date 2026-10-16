@@ -15,6 +15,18 @@ export default function TugasPage() {
   const [search, setSearch] = useState('');
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creatingAssignment, setCreatingAssignment] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    title: '',
+    description: '',
+    subjectId: '',
+    classId: '',
+    dueDate: '',
+    maxScore: '100',
+    status: 'draft' as 'draft' | 'active',
+    allowResubmit: false,
+  });
   const [submitting, setSubmitting] = useState(false);
   const [submitForm, setSubmitForm] = useState({
     content: '',
@@ -61,6 +73,55 @@ export default function TugasPage() {
     const submitted = assignment.submissions?.filter(s => s.status !== 'pending').length || 0;
     const graded = assignment.submissions?.filter(s => s.status === 'graded').length || 0;
     return { total, submitted, graded };
+  };
+
+  const handleCreateAssignment = async () => {
+    if (!user?.id || !createForm.title.trim() || !createForm.subjectId || !createForm.classId || !createForm.dueDate) {
+      alert('Lengkapi judul, mata pelajaran, kelas, dan tenggat tugas.');
+      return;
+    }
+    const maxScore = Number(createForm.maxScore);
+    if (!Number.isFinite(maxScore) || maxScore <= 0) {
+      alert('Nilai maksimum harus berupa angka lebih dari 0.');
+      return;
+    }
+    const targetClass = classes.find(c => c.id === createForm.classId);
+    if (!targetClass || targetClass.schoolId !== user.activeSchoolId) {
+      alert('Kelas tidak valid untuk sekolah aktif.');
+      return;
+    }
+
+    setCreatingAssignment(true);
+    try {
+      const response = await api.assignments.create({
+        title: createForm.title.trim(),
+        description: createForm.description.trim(),
+        subjectId: createForm.subjectId,
+        classId: createForm.classId,
+        teacherId: user.id,
+        dueDate: new Date(createForm.dueDate).toISOString(),
+        maxScore,
+        status: createForm.status,
+        allowResubmit: createForm.allowResubmit,
+        createdAt: new Date().toISOString(),
+      });
+
+      if (!response.success) {
+        alert('Gagal membuat tugas: ' + (response.error || 'Terjadi kesalahan.'));
+        return;
+      }
+
+      setShowCreateModal(false);
+      setCreateForm({ title: '', description: '', subjectId: '', classId: '', dueDate: '', maxScore: '100', status: 'draft', allowResubmit: false });
+      const refreshed = await api.assignments.getAll(user.activeSchoolId, { forceRefresh: true }) as Assignment[] | null;
+      if (refreshed) setAssignments(refreshed);
+      alert('Permintaan pembuatan tugas berhasil dikirim.');
+    } catch (error) {
+      console.error('Create assignment error:', error);
+      alert('Terjadi kesalahan saat membuat tugas.');
+    } finally {
+      setCreatingAssignment(false);
+    }
   };
 
   const handleSubmitTask = async () => {
@@ -152,7 +213,7 @@ export default function TugasPage() {
           <p className="text-gray-500 dark:text-gray-400">Kelola tugas dan pantau pengumpulan siswa</p>
         </div>
         {hasPermission('assignment.manage') && (
-          <button className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+          <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
             <Plus size={18} /> Buat Tugas
           </button>
         )}
@@ -324,6 +385,74 @@ export default function TugasPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Assignment Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Buat Tugas</h2>
+              <button onClick={() => setShowCreateModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" aria-label="Tutup">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Judul Tugas *</label>
+                <input value={createForm.title} onChange={e => setCreateForm({ ...createForm, title: e.target.value })} maxLength={180} placeholder="Contoh: Latihan Bab 1" className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deskripsi / Instruksi</label>
+                <textarea value={createForm.description} onChange={e => setCreateForm({ ...createForm, description: e.target.value })} rows={4} placeholder="Tuliskan petunjuk pengerjaan tugas" className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-y" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mata Pelajaran *</label>
+                  <select value={createForm.subjectId} onChange={e => setCreateForm({ ...createForm, subjectId: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="">Pilih mata pelajaran</option>
+                    {subjects.filter(subject => subject.schoolId === user?.activeSchoolId).map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Kelas *</label>
+                  <select value={createForm.classId} onChange={e => setCreateForm({ ...createForm, classId: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="">Pilih kelas</option>
+                    {classes.filter(cls => cls.schoolId === user?.activeSchoolId).map(cls => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tenggat *</label>
+                  <input type="datetime-local" value={createForm.dueDate} onChange={e => setCreateForm({ ...createForm, dueDate: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nilai Maksimum</label>
+                  <input type="number" min="1" max="1000" value={createForm.maxScore} onChange={e => setCreateForm({ ...createForm, maxScore: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input type="checkbox" checked={createForm.allowResubmit} onChange={e => setCreateForm({ ...createForm, allowResubmit: e.target.checked })} className="rounded border-gray-300" />
+                  Izinkan siswa mengirim ulang
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <span>Status</span>
+                  <select value={createForm.status} onChange={e => setCreateForm({ ...createForm, status: e.target.value as 'draft' | 'active' })} className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="draft">Draft</option>
+                    <option value="active">Aktif</option>
+                  </select>
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Tugas disimpan pada backend Tupari LMS yang sudah dikonfigurasi. Pastikan fungsi backend createAssignment mendukung field di atas sebelum digunakan pada data nyata.</p>
+            </div>
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex gap-3 justify-end">
+              <button onClick={() => setShowCreateModal(false)} disabled={creatingAssignment} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">Batal</button>
+              <button onClick={handleCreateAssignment} disabled={creatingAssignment} className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg disabled:opacity-50">
+                {creatingAssignment ? <><Loader2 size={16} className="animate-spin" /> Menyimpan...</> : <><Plus size={16} /> Simpan Tugas</>}
+              </button>
             </div>
           </div>
         </div>
