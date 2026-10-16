@@ -463,7 +463,7 @@ export const api = {
       return result;
     },
     enablePublicLink: async (assignmentId: string) => {
-      return fetchWithRetry('enablePublicTaskLink', { assignmentId }, { priority: 'high' });
+      return fetchWithRetry<{ publicToken: string }>('enablePublicTaskLink', { assignmentId }, { priority: 'high' });
     },
     submit: async (assignmentId: string, studentId: string, data: any) => {
       return fetchWithRetry('submitAssignment', { assignmentId, studentId, ...data }, { priority: 'high' });
