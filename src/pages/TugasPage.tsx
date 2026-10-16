@@ -99,6 +99,7 @@ export default function TugasPage() {
         subjectId: createForm.subjectId,
         classId: createForm.classId,
         teacherId: user.id,
+        schoolId: user.activeSchoolId,
         dueDate: new Date(createForm.dueDate).toISOString(),
         maxScore,
         status: createForm.status,
