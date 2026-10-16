@@ -192,3 +192,10 @@ Tombol Salin Tautan Siswa pada frontend memanggil aksi terautentikasi `enablePub
 - tidak memasukkan aksi ini ke daftar `publicActions` karena pembuatan tautan membutuhkan autentikasi guru.
 
 Jangan menganggap tombol berbagi siap dipakai sampai handler ini ditambahkan dan diuji. Untuk tugas lama, token dapat dibuat saat guru meminta tautan; untuk tugas baru, token juga dapat dibuat saat pembuatan tugas. Kedua jalur harus memakai generator token backend yang sama.
+
+
+## 6. Filter daftar tugas untuk dashboard guru
+
+Frontend sekarang meminta daftar tugas dengan schoolId, bukan classId. Karena implementasi Assignments.getAssignments yang telah diperiksa hanya memfilter classId, backend harus ditambah dukungan schoolId sebelum daftar tugas guru dianggap benar. Filter sekolah harus memeriksa sekolah kelas yang terkait, sehingga tugas lama tanpa schoolId masih bisa dipetakan dengan aman. Jangan sekadar menerima schoolId dari browser sebagai bukti izin; untuk endpoint guru tetap periksa cakupan sekolah pengguna terautentikasi.
+
+Untuk tugas baru, frontend mengirim schoolId saat membuat tugas. Pastikan header schoolId tersedia di ASSIGNMENTS. Untuk tugas lama, handler enablePublicTaskLink perlu menyimpan token dan, jika schoolId kosong, mengisi schoolId berdasarkan kelas terkait setelah memverifikasi konsistensinya.
