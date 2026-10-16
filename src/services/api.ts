@@ -143,7 +143,7 @@ async function fetchWithRetry<T>(
 // ==================== PUBLIC TASK REQUESTS (NO STUDENT LOGIN) ====================
 // Public task endpoints deliberately omit the logged-in user's token.
 // Read requests may be retried; submission writes are sent once to avoid duplicates.
-async async function publicTaskRequest<T>(
+async function publicTaskRequest<T>(
   action: string,
   payload: Record<string, any>,
   retryRead = false
