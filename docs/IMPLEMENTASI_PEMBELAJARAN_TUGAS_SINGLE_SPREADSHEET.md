@@ -91,3 +91,17 @@ Temuan berikut berasal dari cuplikan modul yang diberikan untuk diperiksa; belum
 5. Tambahkan penyimpanan enam tahap dan progres per siswa pada spreadsheet yang sama hanya setelah skema final ditinjau.
 6. Uji dengan data uji terpisah dari data produksi; lakukan build frontend dan uji langsung GAS sebelum menyatakan fitur siap.
 
+
+### Temuan audit Database CRUD setelah cuplikan Database diberikan (2026-10-16)
+
+- `getAll()` menangkap error lalu mengembalikan array kosong. Pemanggil tidak dapat membedakan sheet benar-benar kosong dari kegagalan membaca; ini berisiko menampilkan keadaan kosong yang menyesatkan.
+- `create()` dan `bulkCreate()` membentuk nilai sel dengan `data[header] || ''`. Nilai valid seperti angka `0` dan boolean `false` berubah menjadi string kosong. Perbaikan perlu memakai pemeriksaan nilai kosong yang eksplisit.
+- `getById()` dan `update()` menggunakan perbandingan ID ketat. Format dan tipe ID harus konsisten antara frontend, sheet, dan relasi USERS/STUDENTS.
+- `create()` menambahkan properti `id` dan `createdAt` langsung ke objek data yang diterima. Pemanggil sebaiknya tidak mengandalkan objek input tetap tidak berubah.
+- `update()` menulis tiap sel secara terpisah dan mengembalikan gabungan `{ id, ...data }`, yang belum tentu merupakan rekaman lengkap terbaru. Operasi multi-field bisa lebih lambat dan perlu dirancang agar konsisten.
+- `getAll()` membaca seluruh rentang sheet dan fungsi filter bekerja di memori. Untuk skala besar, pertimbangkan optimasi setelah kebutuhan dan ukuran data terukur; jangan mengubah pola akses tanpa pengujian.
+- Fungsi CRUD generik ini tidak melakukan otorisasi sendiri. Otorisasi harus dipastikan di router/handler sebelum operasi baca/tulis yang sensitif; parameter dari browser tidak cukup.
+- `create()` dan `bulkCreate()` memetakan data hanya ke header yang sudah ada. Field baru tidak akan tersimpan jika kolomnya belum tersedia; jangan menambah kolom/tab sebelum skema disepakati.
+- Penilaian pada `UploadHandler.gradeSubmission()` tetap perlu validasi nilai numerik dan rentang skor, serta penanganan bila update SUBMISSIONS berhasil tetapi pembuatan GRADES gagal. Hal ini belum dapat diperbaiki dengan aman hanya dari modul CRUD tanpa melihat router, skema, dan pola transaksi yang tersedia.
+
+Temuan di atas merupakan audit statis atas cuplikan kode, bukan bukti uji runtime. Belum ada perubahan pada Apps Script, spreadsheet, branch utama, atau deployment produksi.
