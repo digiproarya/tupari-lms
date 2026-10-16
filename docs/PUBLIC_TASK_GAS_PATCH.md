@@ -1,7 +1,9 @@
 # Patch Google Apps Script: tugas tanpa login siswa
 
 Tanggal: 2026-10-16  
-Status: **disiapkan untuk peninjauan; belum dipasang ke Apps Script atau deployment**
+Status: **rancangan untuk peninjauan; belum dipasang atau diuji di Apps Script**
+
+> **PENTING — belum siap dipasang.** Kode di bawah adalah rancangan awal, bukan patch produksi yang sudah diuji. Sebelum pemasangan, wajib menerapkan kontrol `LockService`, validasi tanggal/kelas/sekolah, memeriksa header aktual, dan mengintegrasikannya dengan router `doPost(e)` yang benar. Jangan menyalin dan deploy apa adanya.
 
 Tujuan: siswa membuka tautan tugas tanpa akun/login LMS. Akses publik dibatasi oleh token acak per tugas. Backend tetap menjadi sumber keputusan; jangan mengandalkan validasi frontend.
 
@@ -199,3 +201,20 @@ Jangan menganggap tombol berbagi siap dipakai sampai handler ini ditambahkan dan
 Frontend sekarang meminta daftar tugas dengan schoolId, bukan classId. Karena implementasi Assignments.getAssignments yang telah diperiksa hanya memfilter classId, backend harus ditambah dukungan schoolId sebelum daftar tugas guru dianggap benar. Filter sekolah harus memeriksa sekolah kelas yang terkait, sehingga tugas lama tanpa schoolId masih bisa dipetakan dengan aman. Jangan sekadar menerima schoolId dari browser sebagai bukti izin; untuk endpoint guru tetap periksa cakupan sekolah pengguna terautentikasi.
 
 Untuk tugas baru, frontend mengirim schoolId saat membuat tugas. Pastikan header schoolId tersedia di ASSIGNMENTS. Untuk tugas lama, handler enablePublicTaskLink perlu menyimpan token dan, jika schoolId kosong, mengisi schoolId berdasarkan kelas terkait setelah memverifikasi konsistensinya.
+
+
+## 5. Kontrol wajib sebelum implementasi
+
+Jangan deploy contoh handler di atas apa adanya. Sebelum kode ditulis ke Apps Script, lakukan perubahan berikut pada salinan uji:
+
+- Gunakan `LockService.getScriptLock()` untuk mengunci alur cek-duplikasi dan simpan submission; lakukan pengecekan ulang setelah lock didapat, lalu `releaseLock()` dalam `finally`.
+- Tolak tenggat yang tidak dapat diparse. Jika tenggat kosong, ikuti kebijakan tugas yang disepakati; jika ada tetapi tidak valid, jangan anggap tugas masih terbuka.
+- Validasi kelas lewat `CLASSES` dan pastikan `class.schoolId` sama dengan sekolah siswa. Jangan hanya mengandalkan `assignment.schoolId`, sebab tugas lama mungkin tidak punya kolom tersebut.
+- Normalisasikan ID sebagai string secara konsisten saat membandingkan header data dari Google Sheets.
+- Untuk tugas dengan `allowResubmit=true`, tampilkan pengumpulan terakhir sebagai yang aktif dan simpan riwayat sebelumnya; untuk false, cegah dua submission bersamaan.
+- Token publik harus dibuat server-side dengan sumber acak yang memadai dan hanya dikembalikan ke guru yang berwenang. Endpoint publik tidak boleh menerbitkan atau mengganti token.
+- Tambahkan uji integrasi pada project GAS uji. Jangan jalankan pengumpulan percobaan pada sheet produksi.
+
+## 6. Status implementasi yang sebenarnya
+
+Frontend mempunyai pemanggilan `getPublicTask` dan `submitPublicTask`, tetapi keberadaan pemanggilan frontend tidak berarti aksi tersebut sudah tersedia pada router GAS. Router dan autentikasi GAS belum tersedia di repositori ini. Sampai router aktual ditinjau, backend tidak dapat dinyatakan selesai.
