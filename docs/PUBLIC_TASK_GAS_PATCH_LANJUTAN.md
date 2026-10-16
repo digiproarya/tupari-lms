@@ -93,3 +93,31 @@ Jangan membuat spreadsheet atau tab baru. Jika header perlu ditambah, backup dul
 - Tidak ada data siswa atau pengumpulan lain yang dikembalikan oleh endpoint publik.
 
 **Status tes: belum dijalankan.** Ini adalah rancangan patch, bukan konfirmasi fungsi sudah berjalan.
+
+
+## E. Pemeriksaan tambahan sebelum backend dinyatakan aman
+
+Saat meninjau rancangan handler di dokumen patch awal, ada beberapa detail yang wajib ditangani sebelum menyalin kode ke Apps Script:
+
+1. **Kunci untuk mencegah pengumpulan ganda.** Pemeriksaan SUBMISSIONS lalu Database.create bukan operasi atomik. Dua permintaan bersamaan bisa lolos dari pemeriksaan yang sama. Bungkus bagian validasi duplikasi dan penulisan submission dengan `LockService.getScriptLock()`, panggil `waitLock(...)`, dan selalu `releaseLock()` di blok `finally`. Periksa ulang data existing setelah lock didapat.
+2. **Tipe nilai spreadsheet.** Nilai `allowResubmit` dari Google Sheets bisa berupa boolean atau teks. Normalisasikan eksplisit; jangan hanya mengandalkan `=== true`.
+3. **Tanggal tenggat.** Validasi tanggal yang tidak valid secara eksplisit. Jika `dueDate` berisi tanggal tidak valid, tolak secara aman atau tandai sebagai konfigurasi tugas bermasalah; jangan membiarkan `NaN` melewati pemeriksaan tenggat.
+4. **Kecocokan sekolah.** Jika `assignment.schoolId` kosong pada tugas lama, tentukan sekolah melalui kelas dan validasi bahwa kelas itu memang milik sekolah yang benar sebelum menerima pengumpulan.
+5. **Skema.** `Database.create` hanya menulis field yang memiliki header. Pastikan header SUBMISSIONS mencakup `id`, `assignmentId`, `studentId`, `content`, `fileUrl`, `submittedAt`, `status`, `score`, `feedback`, dan `createdAt` jika dipakai. Header ASSIGNMENTS harus memiliki `publicToken` dan `schoolId`.
+6. **Kontrak respons.** Frontend menampilkan sukses hanya bila `success === true`. Backend harus mengembalikan sukses hanya setelah Database.create mengonfirmasi penulisan. Jangan mengembalikan sukses pada stub `Assignments.submitAssignment`.
+7. **Privasi.** Endpoint publik hanya mengembalikan data tugas yang diperlukan, tidak mengembalikan daftar siswa, NIS siswa lain, submission, feedback, atau nilai.
+
+## F. Kriteria selesai sebelum merge
+
+- [ ] Build Vercel success pada commit terbaru.
+- [ ] Router doPost ditinjau dan aksi publik dibatasi ke `getPublicTask` dan `submitPublicTask`; `enablePublicTaskLink` wajib melalui autentikasi.
+- [ ] `Assignments.getAssignments` memfilter tugas berdasarkan sekolah yang diverifikasi backend, dengan kompatibilitas tugas lama.
+- [ ] Header sheet yang diperlukan diverifikasi tanpa membuat spreadsheet baru.
+- [ ] Tes sukses: tautan valid + siswa kelas yang benar + tugas aktif + sebelum tenggat.
+- [ ] Tes gagal: token salah, tugas draft/closed, tenggat lewat, NIS salah, nama salah, siswa beda kelas/sekolah.
+- [ ] Tes pengumpulan ganda termasuk dua permintaan bersamaan.
+- [ ] Tes revisi: ditolak jika `allowResubmit=false`; jika true, riwayat lama dipertahankan.
+- [ ] Tes guru: hanya pemilik tugas atau admin berizin yang dapat membuat tautan.
+- [ ] Deployment uji dan data uji terpisah dari produksi; tidak ada perubahan EduTask.
+
+Belum ada runtime test yang dilakukan untuk item-item ini.
