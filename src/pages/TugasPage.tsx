@@ -63,6 +63,7 @@ export default function TugasPage() {
           } else {
             setStudentProfile(null);
             setAssignments([]);
+            alert('Akun siswa belum terhubung dengan data siswa/kelas. Hubungi administrator untuk memperbaiki pemetaan akun.');
           }
         } else {
           const studentsData = await api.students.getAll(user.activeSchoolId) as Student[] | null;
@@ -179,7 +180,7 @@ export default function TugasPage() {
 
       const response = await api.submissions.submit(
         selectedAssignment,
-        user.id,
+        user.role === 'siswa' ? (studentProfile?.id || user.id) : user.id,
         submitForm.content,
         fileUrl
       );
