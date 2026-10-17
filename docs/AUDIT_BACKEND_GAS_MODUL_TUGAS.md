@@ -106,3 +106,29 @@ Langkah kode berikutnya adalah mengaudit source GAS aktif dan header sheet, lalu
 ### Status build/preview
 
 Status pemeriksaan commit PR terakhir yang tersedia menunjukkan check Vercel gagal. Tidak ada log build yang dapat dibaca melalui konektor yang tersedia, dan tidak ada hasil GitHub Actions untuk commit tersebut. Penyebab kegagalan belum terverifikasi; tidak boleh menebak atau mengubah konfigurasi deployment tanpa log yang menunjukkan penyebabnya.
+
+
+## Pembaruan sumber yang ditemukan kembali — 17 Oktober 2026
+
+Pencarian ulang pada file yang pernah dilampirkan dalam percakapan menemukan salinan router GAS:
+- `Pasted text(20261016-150438).txt` — router `doGet/doPost`, sekitar 591 baris.
+- Salinan router lain yang lebih lama juga ditemukan.
+
+Ini membantu mengonfirmasi routing, tetapi **belum sama dengan source GAS lengkap yang sedang aktif/deployed**. Salinan router yang ditemukan memuat:
+- autentikasi token pada POST untuk action selain `login` dan `health`;
+- penempatan `payload.user = user`;
+- `submitTask` memanggil `UploadHandler.submitAssignment(payload.assignmentId, payload.studentId, payload.content, payload.fileUrl)`;
+- `gradeSubmission` memanggil `UploadHandler.gradeSubmission(payload.submissionId, payload.score, payload.feedback)`;
+- action lama `submitAssignment` dan `gradeAssignment` tetap mengarah ke handler berbeda di `Assignments`.
+
+### Temuan keamanan konkret dari router
+
+Walaupun `payload.user` sudah disisipkan setelah autentikasi, router untuk `submitTask` tetap meneruskan `payload.studentId` yang dikirim klien sebagai argumen student ID, dan `gradeSubmission` meneruskan submission ID serta nilai dari klien. Router sendiri tidak menunjukkan pemeriksaan bahwa student/submission tersebut berada dalam sekolah/kelas yang diizinkan untuk user yang terautentikasi.
+
+Ini **belum membuktikan** bahwa handler tidak memiliki pemeriksaan internal—source handler lengkap belum ditemukan—tetapi merupakan titik yang wajib diverifikasi. Jangan menyimpulkan aman hanya karena token diwajibkan.
+
+### Status sumber dan perubahan
+
+- Router yang ditemukan adalah salinan teks dari percakapan, bukan bukti bahwa isinya sama dengan versi GAS aktif.
+- Source lengkap `UploadHandler`, `Assignments`, `Database`, konfigurasi sheet, serta header `SUBMISSIONS/GRADES/ASSIGNMENTS` belum ditemukan pada repo GitHub atau hasil pencarian file yang relevan.
+- Tidak ada perubahan backend GAS dilakukan berdasarkan router saja. Langkah aman berikutnya tetap membandingkan salinan ini dengan kode aktif di Apps Script, kemudian membaca handler dan header yang benar sebelum membuat patch.
