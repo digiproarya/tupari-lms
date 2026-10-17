@@ -344,14 +344,23 @@ export default function TugasPage() {
             </div>
             
             {/* Submit Button untuk Siswa */}
-            {user?.role === 'siswa' && selected.status === 'active' && (
-              <button 
-                onClick={() => setShowSubmitModal(true)}
-                className="mt-4 flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
-              >
-                <Upload size={18} /> Kumpulkan Tugas
-              </button>
-            )}
+            {user?.role === 'siswa' && selected.status === 'active' && (() => {
+              const ownSubmission = selected.submissions?.find(sub =>
+                sub.studentId === studentProfile?.id || sub.studentId === user.id
+              );
+              const mayResubmit = selected.allowResubmit === true;
+              if (ownSubmission && !mayResubmit) {
+                return <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">Tugas sudah dikumpulkan. Pengiriman ulang tidak diizinkan untuk tugas ini.</p>;
+              }
+              return (
+                <button
+                  onClick={() => setShowSubmitModal(true)}
+                  className="mt-4 flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                >
+                  <Upload size={18} /> {ownSubmission ? 'Kirim Ulang Tugas' : 'Kumpulkan Tugas'}
+                </button>
+              );
+            })()}
           </div>
 
           {user?.role === 'siswa' ? (
