@@ -350,12 +350,12 @@ export default function StudentPortalPage() {
                     <span className="text-xs text-gray-500 dark:text-gray-400">
                       Tenggat: {new Date(a.dueDate).toLocaleDateString('id-ID')}
                     </span>
-                    {a.status === 'active' && !isSubmitted && (
+                    {(a.status === 'active' || isSubmitted) && (
                       <button
                         onClick={() => navigate(`/tugas?assignmentId=${encodeURIComponent(a.id)}`)}
                         className="px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg"
                       >
-                        Kumpulkan
+                        {isSubmitted ? 'Lihat detail' : 'Kumpulkan'}
                       </button>
                     )}
                     {isSubmitted && submission?.score !== undefined && (
