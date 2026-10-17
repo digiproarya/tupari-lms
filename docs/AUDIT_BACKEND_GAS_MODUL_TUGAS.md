@@ -84,3 +84,25 @@ Agar patch backend dapat dibuat akurat, audit berikutnya harus menggunakan sourc
 - `Database.getAll/getById/create/update`, `CONFIG.SHEETS`, serta header sheet terkait.
 
 Cuplikan router sudah tersedia dalam percakapan, tetapi bukan pengganti implementasi lengkap handler dan header spreadsheet. Patch terhadap kode yang tidak terlihat akan berisiko membuat data submission/nilai rusak.
+
+
+## Pembaruan audit frontend — 17 Oktober 2026
+
+Pemeriksaan ulang terhadap source branch menghasilkan temuan berikut:
+
+- `src/services/api.ts`: `api.assignments.getAll(schoolId)` mengirim action `getAssignments` dengan parameter `schoolId`; invalidasi cache setelah pembuatan tugas memakai key `assignments_school_<schoolId>`.
+- `src/services/api.ts`: helper `api.submissions.grade(submissionId, score, feedback)` memang ada dan memanggil action `gradeSubmission`.
+- `src/pages/TugasPage.tsx`: tabel pengumpulan guru belum memanggil `api.submissions.grade`; tindakan yang terlihat pada baris pengumpulan hanya membuka file lampiran jika ada. Jadi alur penilaian guru belum tersambung dari UI pada halaman ini.
+- `src/pages/TugasPage.tsx`: nilai dan feedback sudah punya tempat untuk ditampilkan pada tampilan pengumpulan siswa. Ini belum membuktikan data dari handler selalu tersimpan dan terbaca konsisten.
+- `src/types/index.ts`: model `Assignment` memuat `allowResubmit?`, `AssignmentSubmission` memuat `score?` dan `feedback?`. Tipe frontend bukan bukti bahwa kolom-kolom itu ada dengan nama yang sama di spreadsheet produksi.
+- Pemeriksaan file utama `src/App.tsx`, `src/pages/TugasPage.tsx`, `src/services/api.ts`, dan `src/types/index.ts` tidak menemukan referensi `PublicTaskPage`, `publicTasks`, `enablePublicLink`, atau `publicToken` pada versi yang diperiksa.
+
+### Keputusan implementasi setelah pemeriksaan ulang
+
+Penilaian belum ditambahkan ke UI karena handler GAS aktif dan header sheet belum tersedia secara lengkap untuk verifikasi. Menambahkan formulir nilai sekarang akan berisiko memberi kesan bahwa nilai sudah tersimpan, padahal otorisasi, pemetaan kolom, dan hasil persistensi belum dibuktikan.
+
+Langkah kode berikutnya adalah mengaudit source GAS aktif dan header sheet, lalu menyambungkan kontrol penilaian pada halaman Tugas dengan validasi nilai `0..maxScore`, feedback, status berhasil/gagal yang eksplisit, refresh data setelah penyimpanan, dan otorisasi server. Tidak boleh menganggap validasi UI sebagai pengganti validasi backend.
+
+### Status build/preview
+
+Status pemeriksaan commit PR terakhir yang tersedia menunjukkan check Vercel gagal. Tidak ada log build yang dapat dibaca melalui konektor yang tersedia, dan tidak ada hasil GitHub Actions untuk commit tersebut. Penyebab kegagalan belum terverifikasi; tidak boleh menebak atau mengubah konfigurasi deployment tanpa log yang menunjukkan penyebabnya.
