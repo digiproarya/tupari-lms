@@ -90,7 +90,6 @@ export interface Assignment {
   maxScore: number;
   status: 'draft' | 'active' | 'closed';
   allowResubmit?: boolean;
-  publicToken?: string;
   submissions: AssignmentSubmission[];
 }
 
