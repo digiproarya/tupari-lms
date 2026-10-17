@@ -21,7 +21,7 @@ import {
   Bell, User, Loader2, AlertCircle, Calendar, Clock, TrendingUp,
   Download, Eye, CheckCircle2, XCircle, FileText
 } from 'lucide-react';
-import type { Material, Assignment, Grade, Attendance, Exam, Notification } from '../types';
+import type { Material, Assignment, Grade, Attendance, Exam, Notification, Student } from '../types';
 
 type StudentTab = 'home' | 'materi' | 'tugas' | 'nilai' | 'presensi' | 'ujian' | 'pengumuman' | 'profil';
 
