@@ -145,3 +145,14 @@ Ini **belum membuktikan** bahwa handler tidak memiliki pemeriksaan internal—so
 ### Keputusan berikutnya
 
 Tidak mengubah kontrak `getAll(schoolId)` karena sudah cocok dengan helper API. Fokus berikutnya adalah mengaudit sumber GAS yang benar-benar aktif, terutama handler persistensi dan header sheet, kemudian membuat satu perubahan kecil yang bisa diuji: penyimpanan nilai/feedback dari halaman Tugas, validasi rentang nilai terhadap `maxScore`, status error/berhasil, dan pembacaan ulang setelah menyimpan. Jangan menyatakan build/deployment lulus sebelum ada hasil build atau log yang dapat diperiksa.
+
+
+## Pemeriksaan inventaris seluruh branch — 17 Oktober 2026
+
+Pemeriksaan pohon file branch pengembangan melalui GitHub API menemukan 61 file. Tidak ada file berekstensi `.gs` dan tidak ada file bernama `UploadHandler`, `Assignments`, atau `Database`. File implementasi tugas frontend yang ditemukan adalah `src/pages/TugasPage.tsx`; backend GAS tidak dikelola di repositori ini berdasarkan inventaris tersebut.
+
+Dampak:
+1. Tidak ada dasar untuk membuat patch backend GAS di repositori Tupari LMS ini.
+2. Tidak ada perubahan UI penilaian yang dibuat pada putaran ini karena endpoint `gradeSubmission` belum dapat diverifikasi terhadap handler aktif dan skema sheet.
+3. Perubahan berikutnya harus dilakukan pada sumber backend GAS yang memang aktif, setelah source-nya tersedia. Setelah handler tervalidasi, perubahan frontend bisa dilakukan di branch ini secara terpisah.
+4. PR tetap draft dan belum digabung; jangan menganggap pemeriksaan kode sumber sebagai bukti pengujian runtime.
