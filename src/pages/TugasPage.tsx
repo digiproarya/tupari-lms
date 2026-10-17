@@ -568,7 +568,7 @@ export default function TugasPage() {
           </div>
       )}
         </div>
-
+      )}
 
       {/* Create Assignment Modal */}
       {showCreateModal && (
@@ -721,9 +721,6 @@ export default function TugasPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}          )}
     </div>
   );
 }
