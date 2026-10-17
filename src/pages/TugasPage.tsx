@@ -31,6 +31,9 @@ export default function TugasPage() {
     allowResubmit: false,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [gradingSubmissionId, setGradingSubmissionId] = useState<string | null>(null);
+  const [gradeDrafts, setGradeDrafts] = useState<Record<string, { score: string; feedback: string }>>({});
+  const [gradeNotice, setGradeNotice] = useState<string | null>(null);
   const [submitForm, setSubmitForm] = useState({
     content: '',
     file: null as File | null,
@@ -219,6 +222,57 @@ export default function TugasPage() {
     }
   };
 
+  const handleGradeSubmission = async (submissionId: string) => {
+    if (!user || !selected || !hasPermission('assignment.manage')) {
+      setGradeNotice('Akun ini tidak memiliki izin untuk menilai tugas.');
+      return;
+    }
+    const submission = selected.submissions?.find(item => item.id === submissionId);
+    if (!submission) {
+      setGradeNotice('Data pengumpulan tidak ditemukan. Muat ulang daftar tugas.');
+      return;
+    }
+    const draft = gradeDrafts[submissionId] || {
+      score: submission.score === undefined ? '' : String(submission.score),
+      feedback: submission.feedback || '',
+    };
+    const score = Number(draft.score);
+    if (draft.score.trim() === '' || !Number.isFinite(score) || score < 0 || score > Number(selected.maxScore)) {
+      setGradeNotice(`Nilai harus berupa angka antara 0 dan ${selected.maxScore}.`);
+      return;
+    }
+
+    setGradingSubmissionId(submissionId);
+    setGradeNotice(null);
+    try {
+      const response = await api.submissions.grade(submissionId, score, draft.feedback.trim());
+      if (!response?.success) {
+        setGradeNotice('Penilaian belum tersimpan: ' + (response?.error || 'backend tidak mengonfirmasi keberhasilan.'));
+        return;
+      }
+
+      const refreshed = user.activeSchoolId
+        ? await api.assignments.getAll(user.activeSchoolId, { forceRefresh: true }) as Assignment[] | null
+        : null;
+      if (!refreshed) {
+        setGradeNotice('Backend menerima permintaan penilaian, tetapi data terbaru belum dapat dimuat. Periksa kembali sebelum menilai ulang.');
+        return;
+      }
+      setAssignments(refreshed);
+      setGradeDrafts(current => {
+        const next = { ...current };
+        delete next[submissionId];
+        return next;
+      });
+      setGradeNotice('Permintaan penilaian berhasil diproses. Pastikan nilai dan feedback tampil kembali setelah data dimuat ulang.');
+    } catch (error) {
+      console.error('Grade submission error:', error);
+      setGradeNotice('Penilaian gagal dipastikan tersimpan. Periksa koneksi dan muat ulang data sebelum mengirim ulang.');
+    } finally {
+      setGradingSubmissionId(null);
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -399,6 +453,11 @@ export default function TugasPage() {
                 <Download size={14} /> Ekspor
               </button>
             </div>
+            {gradeNotice && (
+              <div role="status" className="mx-4 mt-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-sm text-blue-800 dark:text-blue-200">
+                {gradeNotice}
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700/50">
@@ -432,12 +491,60 @@ export default function TugasPage() {
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                           {sub.score !== undefined ? `${sub.score}/${selected.maxScore}` : '—'}
                         </td>
-                        <td className="px-4 py-3">
-                          {sub.fileUrl && (
-                            <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-500">
-                              <Eye size={14} />
-                            </button>
-                          )}
+                        <td className="px-4 py-3 min-w-[260px]">
+                          <div className="flex flex-col gap-2">
+                            {sub.fileUrl && (
+                              <a href={sub.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                                <Eye size={14} /> Lihat lampiran
+                              </a>
+                            )}
+                            {hasPermission('assignment.manage') && sub.status !== 'pending' && (
+                              <>
+                                <label className="text-xs text-gray-500 dark:text-gray-400">
+                                  Nilai (maks. {selected.maxScore})
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={selected.maxScore}
+                                    step="any"
+                                    value={gradeDrafts[sub.id]?.score ?? (sub.score === undefined ? '' : String(sub.score))}
+                                    onChange={e => setGradeDrafts(current => ({
+                                      ...current,
+                                      [sub.id]: {
+                                        score: e.target.value,
+                                        feedback: current[sub.id]?.feedback ?? sub.feedback ?? '',
+                                      },
+                                    }))}
+                                    className="mt-1 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-sm text-gray-900 dark:text-white"
+                                    aria-label={`Nilai untuk ${student?.name || 'siswa'}`}
+                                  />
+                                </label>
+                                <label className="text-xs text-gray-500 dark:text-gray-400">
+                                  Umpan balik
+                                  <textarea
+                                    rows={2}
+                                    value={gradeDrafts[sub.id]?.feedback ?? sub.feedback ?? ''}
+                                    onChange={e => setGradeDrafts(current => ({
+                                      ...current,
+                                      [sub.id]: {
+                                        score: current[sub.id]?.score ?? (sub.score === undefined ? '' : String(sub.score)),
+                                        feedback: e.target.value,
+                                      },
+                                    }))}
+                                    className="mt-1 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-sm text-gray-900 dark:text-white"
+                                    aria-label={`Umpan balik untuk ${student?.name || 'siswa'}`}
+                                  />
+                                </label>
+                                <button
+                                  onClick={() => handleGradeSubmission(sub.id)}
+                                  disabled={gradingSubmissionId !== null}
+                                  className="inline-flex items-center justify-center gap-1 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                                >
+                                  {gradingSubmissionId === sub.id ? <><Loader2 size={13} className="animate-spin" /> Menyimpan...</> : 'Simpan penilaian'}
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
