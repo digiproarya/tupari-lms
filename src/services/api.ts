@@ -465,8 +465,15 @@ export const api = {
     enablePublicLink: async (assignmentId: string) => {
       return fetchWithRetry<{ publicToken: string }>('enablePublicTaskLink', { assignmentId }, { priority: 'high' });
     },
-    submit: async (assignmentId: string, studentId: string, data: any) => {
-      return fetchWithRetry('submitAssignment', { assignmentId, studentId, ...data }, { priority: 'high' });
+    // Use the existing persistence handler. The legacy submitAssignment route
+    // calls Assignments.submitAssignment, which is a TODO stub in the shared GAS source.
+    submit: async (assignmentId: string, studentId: string, data: { content?: string; fileUrl?: string }) => {
+      return fetchWithRetry('submitTask', {
+        assignmentId,
+        studentId,
+        content: data.content || '',
+        fileUrl: data.fileUrl || '',
+      }, { priority: 'high' });
     },
   },
 
