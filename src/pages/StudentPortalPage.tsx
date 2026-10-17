@@ -35,6 +35,7 @@ export default function StudentPortalPage() {
   // Data states
   const [materials, setMaterials] = useState<Material[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [studentClassId, setStudentClassId] = useState<string | null>(null);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
@@ -57,16 +58,26 @@ export default function StudentPortalPage() {
     
     try {
       // Fetch all student data in parallel
-      const [materialsData, assignmentsData, gradesData, attendanceData, examsData] = await Promise.all([
+      const [materialsData, assignmentsData, gradesData, attendanceData, examsData, studentData] = await Promise.all([
         api.materials.getAll(user.activeSchoolId) as Promise<Material[] | null>,
         api.assignments.getAll(user.activeSchoolId) as Promise<Assignment[] | null>,
         api.grades.getByStudent(user.id) as Promise<Grade[] | null>,
         api.attendance.getByStudent(user.id) as Promise<Attendance[] | null>,
         api.exams.getActive(user.activeSchoolId) as Promise<Exam[] | null>,
+        api.students.getById(user.id) as Promise<any>,
       ]);
 
+      const linkedStudent = studentData && typeof studentData === 'object' && 'data' in studentData
+        ? studentData.data as { classId?: string; schoolId?: string }
+        : studentData as { classId?: string; schoolId?: string } | null;
+      const classId = linkedStudent?.classId;
+      setStudentClassId(classId || null);
       if (materialsData) setMaterials(materialsData);
-      if (assignmentsData) setAssignments(assignmentsData);
+      if (assignmentsData) {
+        // Fail closed: never show all school assignments when student-to-class mapping is missing.
+        setAssignments(classId ? assignmentsData.filter(a => a.classId === classId) : []);
+        if (!classId) setError('Kelas akun siswa belum terhubung dengan data siswa. Hubungi administrator untuk memperbaiki pemetaan kelas.');
+      }
       if (gradesData) setGrades(gradesData);
       if (attendanceData) setAttendance(attendanceData);
       if (examsData) setExams(examsData);
