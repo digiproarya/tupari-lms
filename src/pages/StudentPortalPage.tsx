@@ -78,7 +78,11 @@ export default function StudentPortalPage() {
       if (assignmentsData) {
         // Fail closed: never show all school assignments when student-to-class mapping is missing.
         setAssignments(classId ? assignmentsData.filter(a => a.classId === classId) : []);
-        if (!classId) setError('Kelas akun siswa belum terhubung dengan data siswa. Hubungi administrator untuk memperbaiki pemetaan kelas.');
+      } else {
+        setAssignments([]);
+      }
+      if (!classId) {
+        setError('Kelas akun siswa belum terhubung dengan data siswa. Hubungi administrator untuk memperbaiki pemetaan kelas.');
       }
       if (gradesData) setGrades(gradesData);
       if (attendanceData) setAttendance(attendanceData);
