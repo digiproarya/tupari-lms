@@ -259,12 +259,25 @@ export default function TugasPage() {
         return;
       }
       setAssignments(refreshed);
+      const persistedSubmission = refreshed
+        .find(assignment => assignment.id === selected.id)
+        ?.submissions?.find(item => item.id === submissionId);
+      const feedbackMatches = (persistedSubmission?.feedback || '') === draft.feedback.trim();
+      if (
+        !persistedSubmission ||
+        Number(persistedSubmission.score) !== score ||
+        !feedbackMatches ||
+        persistedSubmission.status !== 'graded'
+      ) {
+        setGradeNotice('Backend merespons berhasil, tetapi nilai/feedback belum terverifikasi pada data terbaru. Jangan kirim ulang berkali-kali; periksa handler GAS dan sheet SUBMISSIONS/GRADES.');
+        return;
+      }
       setGradeDrafts(current => {
         const next = { ...current };
         delete next[submissionId];
         return next;
       });
-      setGradeNotice('Permintaan penilaian berhasil diproses. Pastikan nilai dan feedback tampil kembali setelah data dimuat ulang.');
+      setGradeNotice('Nilai dan umpan balik sudah ditemukan kembali pada data terbaru.');
     } catch (error) {
       console.error('Grade submission error:', error);
       setGradeNotice('Penilaian gagal dipastikan tersimpan. Periksa koneksi dan muat ulang data sebelum mengirim ulang.');
