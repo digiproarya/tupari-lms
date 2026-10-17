@@ -1,3 +1,5 @@
+> **DEPRECATED — JANGAN DIPASANG.** Arah halaman tugas publik terpisah sudah dibatalkan. Keputusan final: EduTask dipindahkan menjadi fitur native pada menu Tugas Tupari LMS, memakai autentikasi dan spreadsheet yang sudah ada. Dokumen ini hanya arsip historis; jangan menyalin patch ini ke GAS produksi.
+
 # Tupari LMS — Patch router GAS untuk Tugas Publik
 
 Status: **patch dokumentasi untuk review**, belum dipasang atau diuji pada Apps Script aktif. Terapkan hanya pada branch kerja GAS setelah mencocokkan router aktif dan header spreadsheet. Jangan ubah deployment produksi atau EduTask dalam langkah ini.
