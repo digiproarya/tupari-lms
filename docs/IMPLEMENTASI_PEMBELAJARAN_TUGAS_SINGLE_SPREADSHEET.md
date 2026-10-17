@@ -93,6 +93,16 @@ Nama tab di atas berasal dari struktur/model Tupari LMS yang tersedia pada branc
 - Pemetaan Bab/TP, rubrik, pemeriksaan otomatis, pengumuman, riwayat login, reset PIN, dan analitik dilakukan terpisah.
 - Fitur AI/eksekusi berkas memerlukan audit keamanan, batas biaya, izin Drive, dan fallback sebelum diaktifkan.
 
+## Koreksi arah implementasi — 17 Oktober 2026
+
+Keputusan final: EduTask menjadi modul **Tugas native di dalam Tupari LMS**. Bukan halaman tugas publik, bukan aplikasi kedua, dan bukan spreadsheet kedua.
+
+- `src/services/api.ts` tidak lagi mengekspos helper/API `publicTasks`, request tanpa token, atau `enablePublicLink`.
+- Model Assignment tidak lagi membawa `publicToken`.
+- Halaman `PublicTaskPage.tsx` dihapus dari branch pengembangan karena tidak sesuai dengan alur native LMS.
+- Dokumen `PUBLIC_TASK_GAS_PATCH*.md` dan `PUBLIC_TASK_ROUTER_PATCH.md` adalah catatan historis/draft arah lama; jangan dipasang ke GAS dan jangan diperlakukan sebagai spesifikasi final.
+- Pengumpulan dari antarmuka native menggunakan handler autentikasi `submitTask`. Ini belum membuktikan keamanan backend: handler GAS wajib mengikat studentId ke identitas token dan memvalidasi kelas/tugas di server.
+
 ## Kriteria selesai sebelum merge/deploy
 
 - [ ] Build dan TypeScript typecheck lulus.
