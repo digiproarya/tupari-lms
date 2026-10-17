@@ -23,6 +23,21 @@ Referensi EduTask yang ditemukan di Library mencakup:
 
 Fitur tersebut perlu dipetakan ke modul Tupari LMS yang relevan; bukan semuanya otomatis disalin ke satu halaman. Prioritaskan alur inti tugas terlebih dahulu, lalu fitur pendukung setelah API dan model datanya terverifikasi.
 
+### Temuan langsung dari source EduTask yang diberikan
+
+Source `index_EduTask_FINAL_ROLLBACK_BATCH.html` dan `Code_EduTask_FINAL_ROLLBACK_BATCH.gs` juga menunjukkan fitur yang harus diperhitungkan dalam migrasi:
+
+- Kartu tugas siswa dengan tombol **Kirim Tugas**, status deadline, dan kondisi pengumpulan terlambat.
+- Metode pengumpulan berupa file dan catatan/jawaban siswa; alur tertentu meminta berkas `.ipynb`.
+- Aturan deadline: pengumpulan bisa ditutup atau terlambat diizinkan dengan batas nilai/pengurangan per hari.
+- Revisi pengumpulan dengan log versi; pengumpulan baru tidak boleh diam-diam menghapus riwayat revisi.
+- Pemetaan kurikulum Bab dan TP, bobot tugas, rubrik/arahan otomatis, serta perhitungan rekap nilai berbobot.
+- Rekap nilai kelas, rekap pengumpulan per kelas, persentase pengumpulan, dan ekspor.
+- Draft penilaian AI disimpan terpisah dari nilai final, termasuk feedback, ringkasan, kekuatan, perbaikan, confidence, status persetujuan, dan waktu persetujuan.
+- Lampiran tugas, pengumuman bertarget kelas, konfigurasi nilai sumatif, serta log revisi.
+
+**Batas migrasi data:** source EduTask menggunakan nama tab dan kolom seperti `Tugas`, `Pengumpulan`, `REVISI_LOG`, `AI_DRAFTS`, dan `LAMPIRAN_TUGAS`. Nama ini tidak boleh langsung dijadikan tab baru di Tupari LMS. Setiap fitur harus dipetakan ke model dan sheet Tupari LMS yang sudah ada; bila sebuah fitur tidak punya padanan aman, tandai sebagai kebutuhan desain terpisah dan jangan membuat tab/spreadsheet baru secara otomatis.
+
 ## Alur tujuan
 
 1. Guru membuka **Tupari LMS → Tugas**, membuat tugas, memilih mata pelajaran/kelas, menulis instruksi, menentukan tenggat, nilai maksimum, izin kirim ulang, dan status draft/aktif.
