@@ -62,6 +62,9 @@ Nama tab di atas berasal dari struktur/model Tupari LMS yang tersedia pada branc
 
 - `TugasPage.tsx` sudah memiliki daftar tugas, form pembuatan, form pengumpulan, dan tampilan pengumpulan.
 - `StudentPortalPage.tsx` sudah menampilkan kartu tugas, tetapi tombol **Kumpulkan** sebelumnya belum mengarah ke alur pengumpulan. Perubahan awal mengarahkannya ke menu Tugas dengan ID tugas terpilih.
+- Kartu tugas kini tetap menyediakan **Lihat detail** setelah pengumpulan agar siswa bisa kembali melihat nilai/umpan balik di menu Tugas.
+- Model `Assignment` kini memiliki `allowResubmit?`; UI detail tugas tidak menawarkan kirim ulang jika pengumpulan sudah ada dan tugas tidak mengizinkannya. Ini hanya guard UI; backend tetap wajib memvalidasi aturan yang sama.
+- Peringatan pemetaan kelas ditampilkan di tab Tugas siswa, bukan memblokir seluruh portal siswa. Jika pemetaan belum ditemukan, daftar tugas tetap kosong (fail-closed).
 - Route terpisah `/tugas-public/:assignmentId` dan tombol salin tautan publik telah dilepas dari jalur UI utama. Ini sesuai keputusan bahwa siswa mengerjakan tugas di dalam LMS, bukan aplikasi publik terpisah.
 - Metode/berkas `PublicTaskPage` atau helper API lama yang tidak lagi digunakan dapat dihapus setelah seluruh referensi dan build diperiksa; jangan menghapus handler backend yang mungkin dipakai fitur lain tanpa audit.
 - Ada risiko penting yang belum boleh dianggap selesai: pemfilteran tugas untuk siswa harus berdasarkan relasi kelas siswa yang terverifikasi di backend; halaman tugas tidak boleh menampilkan pengumpulan milik siswa lain. Data API saat ini dan relasi ID perlu ditelusuri sebelum alur siswa dinyatakan siap.
@@ -103,4 +106,4 @@ Nama tab di atas berasal dari struktur/model Tupari LMS yang tersedia pada branc
 - [ ] Deployment EduTask aktif dan data produksinya tidak disentuh.
 - [ ] Hasil pengujian dan rollback plan didokumentasikan.
 
-**Status saat ini:** integrasi awal navigasi UI telah dibuat di branch pengembangan. Ini belum merupakan migrasi fitur lengkap dan belum siap merge/deploy; backend, keamanan akses kelas, pengumpulan, penilaian, dan build masih harus diverifikasi.
+**Status saat ini:** integrasi awal navigasi dan perilaku UI telah dibuat di branch pengembangan, termasuk detail setelah pengumpulan dan guard kirim ulang. Ini belum merupakan migrasi fitur lengkap dan belum siap merge/deploy. Belum ada bukti bahwa GAS memfilter assignment/submission per pengguna; pemetaan akun siswa masih memakai identifier eksplisit yang perlu diverifikasi. Source backend GAS aktual, header spreadsheet, validasi otorisasi, submit/grade, serta build/typecheck dan pengujian end-to-end belum terverifikasi. Jangan menganggap perubahan UI sebagai kontrol keamanan server.
