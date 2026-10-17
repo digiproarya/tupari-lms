@@ -51,13 +51,15 @@ export default function TugasPage() {
         if (classesData) setClasses(classesData);
 
         if (user.role === 'siswa') {
-          const profileResult = await api.students.getById(user.id) as any;
-          const profile = profileResult && typeof profileResult === 'object' && 'data' in profileResult
-            ? profileResult.data as Student
-            : profileResult as Student | null;
+          const studentsData = await api.students.getAll(user.activeSchoolId, { forceRefresh: true }) as Student[] | null;
+          const profile = (studentsData || []).find(student => {
+            const record = student as Student & { userId?: string; accountId?: string; email?: string };
+            return record.id === user.id || record.userId === user.id || record.accountId === user.id ||
+              (!!user.email && record.email?.toLowerCase() === user.email.toLowerCase());
+          });
           if (profile?.classId && profile.schoolId === user.activeSchoolId) {
             setStudentProfile(profile);
-            setAssignments((assignmentsData || []).filter(a => a.classId === profile.classId && a.schoolId === user.activeSchoolId && a.status === 'active'));
+            setAssignments((assignmentsData || []).filter(a => a.classId === profile.classId && a.status === 'active'));
           } else {
             setStudentProfile(null);
             setAssignments([]);
@@ -422,8 +424,9 @@ export default function TugasPage() {
               </table>
             </div>
           </div>
-        </div>
       )}
+        </div>
+
 
       {/* Create Assignment Modal */}
       {showCreateModal && (
