@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { ClipboardList, Plus, Search, Clock, Users, Loader2, Database, Upload, X, FileText, Download, Eye } from 'lucide-react';
@@ -7,13 +8,14 @@ import { uploadFile, validateFile, formatFileSize } from '../utils/upload';
 
 export default function TugasPage() {
   const { user, hasPermission } = useAuth();
+  const [searchParams] = useSearchParams();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<string | null>(() => searchParams.get('assignmentId'));
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creatingAssignment, setCreatingAssignment] = useState(false);
@@ -281,40 +283,7 @@ export default function TugasPage() {
                           <div className="h-full bg-green-500 rounded-full" style={{ width: `${stats.total > 0 ? (stats.submitted / stats.total) * 100 : 0}%` }} />
                         </div>
                         <p className="text-xs text-gray-500 mt-1">{stats.graded} dinilai</p>
-                      </div>
-                      {hasPermission('assignment.manage') && (
-                        <button
-                          onClick={async () => {
-                            try {
-                              let publicToken = assignment.publicToken;
-                              if (!publicToken) {
-                                const enabled = await api.assignments.enablePublicLink(assignment.id);
-                                if (!enabled.success || !enabled.data?.publicToken) {
-                                  alert('Tautan publik belum dapat dibuat: ' + (enabled.error || 'Backend Apps Script belum dipasang atau tugas tidak diizinkan.'));
-                                  return;
-                                }
-                                publicToken = enabled.data.publicToken;
-                                setAssignments(current => current.map(item =>
-                                  item.id === assignment.id ? { ...item, publicToken } : item
-                                ));
-                              }
-                              const url = `${window.location.origin}${window.location.pathname}#/tugas-public/${encodeURIComponent(assignment.id)}?token=${encodeURIComponent(publicToken)}`;
-                              try {
-                                await navigator.clipboard.writeText(url);
-                                alert('Tautan tugas berhasil disalin. Siswa dapat membukanya tanpa login.');
-                              } catch {
-                                window.prompt('Salin tautan tugas untuk dibagikan kepada siswa:', url);
-                              }
-                            } catch (error) {
-                              console.error('Public task link error:', error);
-                              alert('Tautan tugas belum dapat dibuat. Pastikan patch backend sudah dipasang.');
-                            }
-                          }}
-                          className="px-3 py-1.5 text-sm border border-green-300 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
-                          Salin Tautan Siswa
-                        </button>
-                      )}
-                      <button onClick={() => setSelectedAssignment(assignment.id)}
+                      </div><button onClick={() => setSelectedAssignment(assignment.id)}
                         className="px-3 py-1.5 text-sm bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors">
                         Detail
                       </button>
