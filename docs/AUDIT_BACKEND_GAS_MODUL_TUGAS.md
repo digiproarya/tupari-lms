@@ -172,3 +172,21 @@ Perubahan terbatas dibuat pada `src/pages/TugasPage.tsx` di branch pengembangan:
 ### Batas verifikasi
 
 Ini adalah perubahan frontend, bukan perbaikan handler GAS. Pemeriksaan data setelah refresh hanya dapat membuktikan persistensi jika endpoint `getAssignments` benar-benar mengembalikan submission terbaru. Source GAS aktif, otorisasi server, pemetaan header sheet, dan perilaku runtime masih belum dapat diverifikasi dari repo ini. Belum ada hasil `npm run build`, `npm run typecheck`, atau end-to-end test yang dapat diklaim lulus. PR tetap tidak boleh digabung ke `main` sebelum pemeriksaan tersebut.
+
+
+## Validasi CI setelah perbaikan frontend — 17 Oktober 2026
+
+CI GitHub Actions pada commit `3d1f250347352f38ed10ed1c3f097405c7042557` berhasil:
+
+- `npm ci`: lulus.
+- `npm run typecheck`: lulus.
+- `npm run build`: lulus.
+- Status deployment preview Vercel untuk commit tersebut: success.
+
+Selama validasi, CI menemukan dua masalah frontend yang diperbaiki pada branch ini:
+1. JSX `TugasPage.tsx` memiliki penutup conditional yang hilang dan potongan penutup duplikat; diperbaiki, kemudian typecheck/build lulus.
+2. `AuthContext.tsx` mengirim argumen token ke `api.auth.logout`, padahal helper mengambil token sendiri dan tidak menerima argumen; pemanggilan diperbaiki, kemudian typecheck/build lulus.
+
+### Yang belum dibuktikan
+
+CI lulus hanya membuktikan instalasi dependensi, TypeScript typecheck, dan build produksi. Ini bukan tes runtime atau end-to-end. Source GAS aktif dan header spreadsheet tetap belum tersedia; karena itu otorisasi server, penyimpanan nilai/feedback, pemetaan kelas/sekolah, tenggat, resubmission, dan pembacaan ulang dari spreadsheet belum bisa dinyatakan lulus. PR tidak boleh dianggap siap produksi hanya dari hasil build.
