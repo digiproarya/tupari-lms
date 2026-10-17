@@ -407,16 +407,30 @@ export const api = {
 
   // ---------- ASSIGNMENTS ----------
   assignments: {
-    getAll: async (classId: string, options: RequestOptions = {}) => {
+    getAll: async (schoolId: string, options: RequestOptions = {}) => {
       return getCachedData(
-        `assignments_${classId}`,
-        () => fetchWithRetry('getAssignments', { classId }),
+        `assignments_school_${schoolId}`,
+        () => fetchWithRetry('getAssignments', { schoolId }),
         CONFIG.CACHE_TTL.assignments,
         options
       );
     },
-    submit: async (assignmentId: string, studentId: string, data: any) => {
-      return fetchWithRetry('submitAssignment', { assignmentId, studentId, ...data }, { priority: 'high' });
+    create: async (data: any) => {
+      const result = await fetchWithRetry('createAssignment', data, { priority: 'high' });
+      if (result.success && data.schoolId) {
+        await db.delete('cache', `assignments_school_${data.schoolId}`);
+      }
+      return result;
+    },
+    // Use the existing persistence handler. The legacy submitAssignment route
+    // calls Assignments.submitAssignment, which is a TODO stub in the shared GAS source.
+    submit: async (assignmentId: string, studentId: string, data: { content?: string; fileUrl?: string }) => {
+      return fetchWithRetry('submitTask', {
+        assignmentId,
+        studentId,
+        content: data.content || '',
+        fileUrl: data.fileUrl || '',
+      }, { priority: 'high' });
     },
   },
 

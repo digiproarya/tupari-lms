@@ -89,6 +89,7 @@ export interface Assignment {
   dueDate: string;
   maxScore: number;
   status: 'draft' | 'active' | 'closed';
+  allowResubmit?: boolean;
   submissions: AssignmentSubmission[];
 }
 

@@ -13,6 +13,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import {
@@ -20,15 +21,18 @@ import {
   Bell, User, Loader2, AlertCircle, Calendar, Clock, TrendingUp,
   Download, Eye, CheckCircle2, XCircle, FileText
 } from 'lucide-react';
-import type { Material, Assignment, Grade, Attendance, Exam, Notification } from '../types';
+import type { Material, Assignment, Grade, Attendance, Exam, Notification, Student } from '../types';
 
 type StudentTab = 'home' | 'materi' | 'tugas' | 'nilai' | 'presensi' | 'ujian' | 'pengumuman' | 'profil';
 
 export default function StudentPortalPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<StudentTab>('home');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [taskMappingWarning, setTaskMappingWarning] = useState<string | null>(null);
+  const [studentRecordId, setStudentRecordId] = useState<string | null>(null);
   
   // Data states
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -55,16 +59,32 @@ export default function StudentPortalPage() {
     
     try {
       // Fetch all student data in parallel
-      const [materialsData, assignmentsData, gradesData, attendanceData, examsData] = await Promise.all([
+      const [materialsData, assignmentsData, gradesData, attendanceData, examsData, studentsData] = await Promise.all([
         api.materials.getAll(user.activeSchoolId) as Promise<Material[] | null>,
         api.assignments.getAll(user.activeSchoolId) as Promise<Assignment[] | null>,
         api.grades.getByStudent(user.id) as Promise<Grade[] | null>,
         api.attendance.getByStudent(user.id) as Promise<Attendance[] | null>,
         api.exams.getActive(user.activeSchoolId) as Promise<Exam[] | null>,
+        api.students.getAll(user.activeSchoolId, { forceRefresh: true }) as Promise<Student[] | null>,
       ]);
 
+      // Match only explicit account identifiers. If the account/student relation is absent,
+      // fail closed rather than showing tasks for every class in the school.
+      const linkedStudent = (studentsData || []).find(student => {
+        const record = student as Student & { userId?: string; accountId?: string; email?: string };
+        return record.id === user.id || record.userId === user.id || record.accountId === user.id ||
+          (!!user.email && record.email?.toLowerCase() === user.email.toLowerCase());
+      });
+      const classId = linkedStudent?.classId;
+      setStudentRecordId(linkedStudent?.id || null);
+      setTaskMappingWarning(classId ? null : 'Akun siswa belum terhubung dengan data kelas. Daftar tugas disembunyikan sampai pemetaan diperbaiki. Hubungi administrator sekolah.');
       if (materialsData) setMaterials(materialsData);
-      if (assignmentsData) setAssignments(assignmentsData);
+      if (assignmentsData) {
+        // Fail closed: never show all school assignments when student-to-class mapping is missing.
+        setAssignments(classId ? assignmentsData.filter(a => a.classId === classId && (!(a as Assignment & { schoolId?: string }).schoolId || (a as Assignment & { schoolId?: string }).schoolId === user.activeSchoolId)) : []);
+      } else {
+        setAssignments([]);
+      }
       if (gradesData) setGrades(gradesData);
       if (attendanceData) setAttendance(attendanceData);
       if (examsData) setExams(examsData);
@@ -129,7 +149,7 @@ export default function StudentPortalPage() {
   // Calculate statistics
   const pendingAssignments = assignments.filter(a => a.status === 'active');
   const completedAssignments = assignments.filter(a => 
-    a.submissions?.some(s => s.studentId === user.id && s.status !== 'pending')
+    a.submissions?.some(s => (s.studentId === studentRecordId || s.studentId === user.id) && s.status !== 'pending')
   );
   const avgScore = grades.length > 0 
     ? Math.round(grades.reduce((a, g) => a + g.score, 0) / grades.length) 
@@ -288,6 +308,11 @@ export default function StudentPortalPage() {
 
       {activeTab === 'tugas' && (
         <div className="space-y-4">
+          {taskMappingWarning && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200" role="alert">
+              {taskMappingWarning}
+            </div>
+          )}
           {assignments.length === 0 ? (
             <div className="text-center py-16 text-gray-500 dark:text-gray-400">
               <ClipboardList size={48} className="mx-auto mb-4 opacity-50" />
@@ -295,7 +320,7 @@ export default function StudentPortalPage() {
             </div>
           ) : (
             assignments.map(a => {
-              const submission = a.submissions?.find(s => s.studentId === user.id);
+              const submission = a.submissions?.find(s => s.studentId === studentRecordId || s.studentId === user.id);
               const isSubmitted = submission && submission.status !== 'pending';
               
               return (
@@ -325,9 +350,12 @@ export default function StudentPortalPage() {
                     <span className="text-xs text-gray-500 dark:text-gray-400">
                       Tenggat: {new Date(a.dueDate).toLocaleDateString('id-ID')}
                     </span>
-                    {a.status === 'active' && !isSubmitted && (
-                      <button className="px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
-                        Kumpulkan
+                    {(a.status === 'active' || isSubmitted) && (
+                      <button
+                        onClick={() => navigate(`/tugas?assignmentId=${encodeURIComponent(a.id)}`)}
+                        className="px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg"
+                      >
+                        {isSubmitted ? 'Lihat detail' : 'Kumpulkan'}
                       </button>
                     )}
                     {isSubmitted && submission?.score !== undefined && (

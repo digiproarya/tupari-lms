@@ -1,0 +1,192 @@
+# Audit Backend GAS — Modul Tugas Tupari LMS
+
+Tanggal audit: 17 Oktober 2026  
+Branch: `feature/pembelajaran-tugas-single-spreadsheet`  
+Status: audit source yang pernah dibagikan; **belum ada perubahan atau deployment GAS**.
+
+## Tujuan
+
+Memindahkan workflow EduTask ke menu Tugas Tupari LMS yang sudah ada. Bukan aplikasi kedua, bukan spreadsheet kedua, dan tidak menyentuh deployment EduTask aktif.
+
+## Bukti dari router GAS yang dibagikan
+
+File router yang dibagikan sebelumnya menunjukkan:
+
+- `doGet` mewajibkan token untuk semua action kecuali `health` dan `verifyToken`.
+- `getAssignments` diteruskan ke `Assignments.getAssignments(params)`.
+- `doPost` mewajibkan autentikasi untuk semua action kecuali `login` dan `health`, kemudian menambahkan `payload.user = user`.
+- `createAssignment` diteruskan ke `Assignments.createAssignment(payload)`.
+- `submitAssignment` diteruskan ke `Assignments.submitAssignment(payload)`.
+- `gradeAssignment` diteruskan ke `Assignments.gradeSubmission(payload)`.
+- Router juga memiliki jalur `submitTask` ke `UploadHandler.submitAssignment(assignmentId, studentId, content, fileUrl)` dan `gradeSubmission` ke `UploadHandler.gradeSubmission(submissionId, score, feedback)`.
+
+## Risiko dan temuan
+
+### 1. Ada dua pasang jalur submit/grade
+
+Router mengekspose dua pasangan berbeda:
+
+| Action | Handler | Status bukti |
+|---|---|---|
+| `submitAssignment` | `Assignments.submitAssignment(payload)` | Cuplikan audit terdahulu menyebut implementasi ini stub/tidak menyimpan. Source lengkap perlu diverifikasi ulang sebelum diubah. |
+| `submitTask` | `UploadHandler.submitAssignment(...)` | Jalur yang menurut source terdahulu melakukan validasi tugas dan menyimpan ke SUBMISSIONS. |
+| `gradeAssignment` | `Assignments.gradeSubmission(payload)` | Cuplikan audit terdahulu menyebut implementasi ini stub/tidak menyimpan. |
+| `gradeSubmission` | `UploadHandler.gradeSubmission(...)` | Jalur yang menurut source terdahulu memperbarui pengumpulan dan menulis nilai. |
+
+**Keputusan aman:** jangan mengalihkan semua pemanggil ke salah satu action sebelum seluruh pemanggil frontend dan kode handler aktual diperiksa. Hindari sukses palsu yang tidak menyimpan data.
+
+### 2. Router hanya membuktikan autentikasi token, bukan otorisasi objek
+
+Router menambahkan objek user ke payload, tetapi pada cuplikan yang tersedia belum terlihat pemeriksaan bahwa:
+- guru hanya membuat/mengubah/menilai tugas di sekolah dan kelas yang menjadi kewenangannya;
+- siswa hanya mengambil tugas kelasnya sendiri;
+- siswa tidak dapat mengirim submission menggunakan `studentId` milik siswa lain;
+- guru tidak dapat mengubah nilai submission di luar kelas/sekolahnya.
+
+Validasi harus berada di backend, menggunakan identitas dari token dan relasi siswa/kelas/sekolah dari database. Jangan mempercayai `studentId`, `schoolId`, atau `teacherId` yang dikirim browser.
+
+### 3. Filter frontend bukan kontrol keamanan
+
+Pada frontend branch saat ini, `api.assignments.getAll(schoolId)` mengirim `getAssignments` dengan `schoolId`. Cuplikan kode handler yang tersedia sebelumnya menunjukkan filter `classId`, `subjectId`, dan `status`, namun tidak membuktikan filter `schoolId` atau otorisasi per role. Ini harus diperiksa pada implementasi backend penuh sebelum dinyatakan aman.
+
+### 4. Pemetaan akun siswa belum terbukti
+
+Frontend saat ini berusaha mencocokkan akun login dengan record siswa memakai `id`, `userId`, `accountId`, atau email. Itu hanya mekanisme fallback UI dan belum membuktikan bahwa struktur produksi menggunakan salah satu field tersebut. Relasi kanonik perlu ditentukan dari skema USERS/STUDENTS aktual; NIS/NISN sebaiknya tidak dipakai sebagai satu-satunya pengganti ID akun tanpa aturan unik yang terverifikasi.
+
+### 5. Pengiriman ulang perlu validasi server
+
+`allowResubmit` kini tersedia pada tipe frontend dan UI membatasi tombol kirim ulang. Backend tetap harus mengecek flag tugas, tenggat, status tugas, identitas siswa, dan aturan duplikasi secara atomik sebelum menulis data. Guard UI saja dapat dilewati.
+
+## Urutan implementasi backend yang aman
+
+1. Ambil source aktif dan versi deployment GAS tanpa mengubahnya; identifikasi file router, `Assignments`, `UploadHandler`, `Database`, `CONFIG.SHEETS`, dan fungsi auth.
+2. Catat header sheet aktual untuk ASSIGNMENTS, STUDENTS/USERS, SUBMISSIONS, dan GRADES. Jangan membuat tab baru dan jangan mengubah header produksi saat audit.
+3. Lacak pemanggilan API frontend untuk daftar, pembuatan, pengumpulan, dan penilaian; pilih satu jalur kanonik per operasi setelah memastikan handler mana yang benar-benar menyimpan.
+4. Implementasikan otorisasi berdasarkan user token dan relasi sekolah/kelas; jangan mempercayai ID kepemilikan dari browser.
+5. Tambahkan validasi tenggat, status tugas, batas nilai, resubmission, dan duplikasi di server. Gunakan `LockService` atau mekanisme atomik yang sesuai jika perlu mencegah dua pengiriman bersamaan.
+6. Uji di salinan/staging dengan data uji: guru sekolah A, guru sekolah B, siswa kelas A, siswa kelas B; tugas aktif/draft/ditutup; submit pertama/kedua; deadline; penilaian dan feedback.
+7. Jalankan build/typecheck frontend dan tes API end-to-end. Baru setelah lulus, tinjau diff dan rencana rilis secara terpisah.
+
+## Yang belum dilakukan
+
+- Tidak ada source GAS produksi yang diubah.
+- Tidak ada spreadsheet, tab, header, deployment, trigger, atau properti produksi yang diubah.
+- Tidak ada perubahan pada EduTask aktif.
+- Tidak ada merge PR atau deployment.
+- Build, typecheck, dan tes end-to-end belum dijalankan di lingkungan lokal.
+
+## Source yang masih dibutuhkan untuk menerapkan patch kode
+
+Agar patch backend dapat dibuat akurat, audit berikutnya harus menggunakan source GAS aktif yang memuat implementasi penuh:
+- router `doPost(e)` dan `authenticatePostRequest(e)`;
+- `Assignments.getAssignments`, `createAssignment`, `submitAssignment`, `gradeSubmission`;
+- `UploadHandler.submitAssignment`, `gradeSubmission`;
+- `Database.getAll/getById/create/update`, `CONFIG.SHEETS`, serta header sheet terkait.
+
+Cuplikan router sudah tersedia dalam percakapan, tetapi bukan pengganti implementasi lengkap handler dan header spreadsheet. Patch terhadap kode yang tidak terlihat akan berisiko membuat data submission/nilai rusak.
+
+
+## Pembaruan audit frontend — 17 Oktober 2026
+
+Pemeriksaan ulang terhadap source branch menghasilkan temuan berikut:
+
+- `src/services/api.ts`: `api.assignments.getAll(schoolId)` mengirim action `getAssignments` dengan parameter `schoolId`; invalidasi cache setelah pembuatan tugas memakai key `assignments_school_<schoolId>`.
+- `src/services/api.ts`: helper `api.submissions.grade(submissionId, score, feedback)` memang ada dan memanggil action `gradeSubmission`.
+- `src/pages/TugasPage.tsx`: tabel pengumpulan guru belum memanggil `api.submissions.grade`; tindakan yang terlihat pada baris pengumpulan hanya membuka file lampiran jika ada. Jadi alur penilaian guru belum tersambung dari UI pada halaman ini.
+- `src/pages/TugasPage.tsx`: nilai dan feedback sudah punya tempat untuk ditampilkan pada tampilan pengumpulan siswa. Ini belum membuktikan data dari handler selalu tersimpan dan terbaca konsisten.
+- `src/types/index.ts`: model `Assignment` memuat `allowResubmit?`, `AssignmentSubmission` memuat `score?` dan `feedback?`. Tipe frontend bukan bukti bahwa kolom-kolom itu ada dengan nama yang sama di spreadsheet produksi.
+- Pemeriksaan file utama `src/App.tsx`, `src/pages/TugasPage.tsx`, `src/services/api.ts`, dan `src/types/index.ts` tidak menemukan referensi `PublicTaskPage`, `publicTasks`, `enablePublicLink`, atau `publicToken` pada versi yang diperiksa.
+
+### Keputusan implementasi setelah pemeriksaan ulang
+
+Penilaian belum ditambahkan ke UI karena handler GAS aktif dan header sheet belum tersedia secara lengkap untuk verifikasi. Menambahkan formulir nilai sekarang akan berisiko memberi kesan bahwa nilai sudah tersimpan, padahal otorisasi, pemetaan kolom, dan hasil persistensi belum dibuktikan.
+
+Langkah kode berikutnya adalah mengaudit source GAS aktif dan header sheet, lalu menyambungkan kontrol penilaian pada halaman Tugas dengan validasi nilai `0..maxScore`, feedback, status berhasil/gagal yang eksplisit, refresh data setelah penyimpanan, dan otorisasi server. Tidak boleh menganggap validasi UI sebagai pengganti validasi backend.
+
+### Status build/preview
+
+Status pemeriksaan commit PR terakhir yang tersedia menunjukkan check Vercel gagal. Tidak ada log build yang dapat dibaca melalui konektor yang tersedia, dan tidak ada hasil GitHub Actions untuk commit tersebut. Penyebab kegagalan belum terverifikasi; tidak boleh menebak atau mengubah konfigurasi deployment tanpa log yang menunjukkan penyebabnya.
+
+
+## Pembaruan sumber yang ditemukan kembali — 17 Oktober 2026
+
+Pencarian ulang pada file yang pernah dilampirkan dalam percakapan menemukan salinan router GAS:
+- `Pasted text(20261016-150438).txt` — router `doGet/doPost`, sekitar 591 baris.
+- Salinan router lain yang lebih lama juga ditemukan.
+
+Ini membantu mengonfirmasi routing, tetapi **belum sama dengan source GAS lengkap yang sedang aktif/deployed**. Salinan router yang ditemukan memuat:
+- autentikasi token pada POST untuk action selain `login` dan `health`;
+- penempatan `payload.user = user`;
+- `submitTask` memanggil `UploadHandler.submitAssignment(payload.assignmentId, payload.studentId, payload.content, payload.fileUrl)`;
+- `gradeSubmission` memanggil `UploadHandler.gradeSubmission(payload.submissionId, payload.score, payload.feedback)`;
+- action lama `submitAssignment` dan `gradeAssignment` tetap mengarah ke handler berbeda di `Assignments`.
+
+### Temuan keamanan konkret dari router
+
+Walaupun `payload.user` sudah disisipkan setelah autentikasi, router untuk `submitTask` tetap meneruskan `payload.studentId` yang dikirim klien sebagai argumen student ID, dan `gradeSubmission` meneruskan submission ID serta nilai dari klien. Router sendiri tidak menunjukkan pemeriksaan bahwa student/submission tersebut berada dalam sekolah/kelas yang diizinkan untuk user yang terautentikasi.
+
+Ini **belum membuktikan** bahwa handler tidak memiliki pemeriksaan internal—source handler lengkap belum ditemukan—tetapi merupakan titik yang wajib diverifikasi. Jangan menyimpulkan aman hanya karena token diwajibkan.
+
+### Status sumber dan perubahan
+
+- Router yang ditemukan adalah salinan teks dari percakapan, bukan bukti bahwa isinya sama dengan versi GAS aktif.
+- Source lengkap `UploadHandler`, `Assignments`, `Database`, konfigurasi sheet, serta header `SUBMISSIONS/GRADES/ASSIGNMENTS` belum ditemukan pada repo GitHub atau hasil pencarian file yang relevan.
+- Tidak ada perubahan backend GAS dilakukan berdasarkan router saja. Langkah aman berikutnya tetap membandingkan salinan ini dengan kode aktif di Apps Script, kemudian membaca handler dan header yang benar sebelum membuat patch.
+
+
+## Pemeriksaan frontend/API tambahan — 17 Oktober 2026
+
+- `api.assignments.getAll(schoolId, options)` memang mengirim `{ schoolId }` ke action `getAssignments` dan menggunakan cache key `assignments_school_<schoolId>`. Jadi pemanggilan frontend ini bukan salah posisi argumen.
+- `api.assignments.create(data)` menghapus cache sekolah terkait setelah pembuatan tugas berhasil.
+- `api.submissions.grade(submissionId, score, feedback)` tersedia sebagai helper di API, tetapi pencarian langsung pada `src/pages/TugasPage.tsx` tidak menemukan pemanggilan `api.submissions.grade`, `gradeSubmission`, atau handler penilaian. Form/aksi penilaian guru belum tersambung pada halaman Tugas yang diperiksa.
+- `src/pages/TugasPage.tsx` memiliki state untuk membuka modal pengumpulan dan pembuatan tugas; belum ditemukan state/handler penilaian pada file itu.
+- `vercel.json` dan `vite.config.ts` tidak ditemukan pada root branch yang diperiksa. Ini belum menjelaskan kegagalan Vercel; tanpa log build, penyebabnya belum dapat dipastikan. `tsconfig.json` menggunakan strict mode dan `package.json` menyediakan skrip `build` dan `typecheck`, tetapi build tidak dapat dijalankan dari konektor GitHub saja.
+
+### Keputusan berikutnya
+
+Tidak mengubah kontrak `getAll(schoolId)` karena sudah cocok dengan helper API. Fokus berikutnya adalah mengaudit sumber GAS yang benar-benar aktif, terutama handler persistensi dan header sheet, kemudian membuat satu perubahan kecil yang bisa diuji: penyimpanan nilai/feedback dari halaman Tugas, validasi rentang nilai terhadap `maxScore`, status error/berhasil, dan pembacaan ulang setelah menyimpan. Jangan menyatakan build/deployment lulus sebelum ada hasil build atau log yang dapat diperiksa.
+
+
+## Pemeriksaan inventaris seluruh branch — 17 Oktober 2026
+
+Pemeriksaan pohon file branch pengembangan melalui GitHub API menemukan 61 file. Tidak ada file berekstensi `.gs` dan tidak ada file bernama `UploadHandler`, `Assignments`, atau `Database`. File implementasi tugas frontend yang ditemukan adalah `src/pages/TugasPage.tsx`; backend GAS tidak dikelola di repositori ini berdasarkan inventaris tersebut.
+
+Dampak:
+1. Tidak ada dasar untuk membuat patch backend GAS di repositori Tupari LMS ini.
+2. Tidak ada perubahan UI penilaian yang dibuat pada putaran ini karena endpoint `gradeSubmission` belum dapat diverifikasi terhadap handler aktif dan skema sheet.
+3. Perubahan berikutnya harus dilakukan pada sumber backend GAS yang memang aktif, setelah source-nya tersedia. Setelah handler tervalidasi, perubahan frontend bisa dilakukan di branch ini secara terpisah.
+4. PR tetap draft dan belum digabung; jangan menganggap pemeriksaan kode sumber sebagai bukti pengujian runtime.
+
+
+## Perubahan frontend penilaian — 17 Oktober 2026
+
+Perubahan terbatas dibuat pada `src/pages/TugasPage.tsx` di branch pengembangan:
+
+- Menambahkan input nilai dan umpan balik pada baris pengumpulan siswa untuk pengguna yang memiliki izin `assignment.manage`.
+- Memvalidasi nilai wajib numerik dalam rentang 0 sampai `maxScore` sebelum mengirim permintaan.
+- Menghubungkan tombol simpan ke helper API yang sudah ada, `api.submissions.grade(submissionId, score, feedback)`.
+- Menambahkan status proses, pesan kegagalan, dan pemuatan ulang data sesudah respons sukses.
+- Sesudah pemuatan ulang, frontend memeriksa apakah nilai, feedback, dan status `graded` ditemukan kembali di data tugas. Jika tidak cocok, UI memberi peringatan bahwa persistensi belum terverifikasi, bukan menyatakan penilaian selesai.
+- Tautan lampiran kini memakai URL langsung dengan `target="_blank"` dan `rel="noreferrer"`.
+
+### Batas verifikasi
+
+Ini adalah perubahan frontend, bukan perbaikan handler GAS. Pemeriksaan data setelah refresh hanya dapat membuktikan persistensi jika endpoint `getAssignments` benar-benar mengembalikan submission terbaru. Source GAS aktif, otorisasi server, pemetaan header sheet, dan perilaku runtime masih belum dapat diverifikasi dari repo ini. Belum ada hasil `npm run build`, `npm run typecheck`, atau end-to-end test yang dapat diklaim lulus. PR tetap tidak boleh digabung ke `main` sebelum pemeriksaan tersebut.
+
+
+## Validasi CI setelah perbaikan frontend — 17 Oktober 2026
+
+CI GitHub Actions pada commit `3d1f250347352f38ed10ed1c3f097405c7042557` berhasil:
+
+- `npm ci`: lulus.
+- `npm run typecheck`: lulus.
+- `npm run build`: lulus.
+- Status deployment preview Vercel untuk commit tersebut: success.
+
+Selama validasi, CI menemukan dua masalah frontend yang diperbaiki pada branch ini:
+1. JSX `TugasPage.tsx` memiliki penutup conditional yang hilang dan potongan penutup duplikat; diperbaiki, kemudian typecheck/build lulus.
+2. `AuthContext.tsx` mengirim argumen token ke `api.auth.logout`, padahal helper mengambil token sendiri dan tidak menerima argumen; pemanggilan diperbaiki, kemudian typecheck/build lulus.
+
+### Yang belum dibuktikan
+
+CI lulus hanya membuktikan instalasi dependensi, TypeScript typecheck, dan build produksi. Ini bukan tes runtime atau end-to-end. Source GAS aktif dan header spreadsheet tetap belum tersedia; karena itu otorisasi server, penyimpanan nilai/feedback, pemetaan kelas/sekolah, tenggat, resubmission, dan pembacaan ulang dari spreadsheet belum bisa dinyatakan lulus. PR tidak boleh dianggap siap produksi hanya dari hasil build.

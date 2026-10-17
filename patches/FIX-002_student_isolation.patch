@@ -1,0 +1,116 @@
+--- a/backend-gas/Students.gs
++++ b/backend-gas/Students.gs
+@@ -2,93 +2,129 @@
+  * TUPARI LMS - Students Module
+  */
+ 
++function studentSchoolIds_(user) {
++  if (!user) return [];
++  var raw = user.schoolIds;
++  if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
++  if (typeof raw === 'string' && raw.trim()) {
++    try {
++      var parsed = JSON.parse(raw);
++      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
++    } catch (err) {
++      // Fail closed for malformed scope.
++    }
++  }
++  return user.activeSchoolId ? [String(user.activeSchoolId)] : [];
++}
++
++function assertStudentSchoolAccess_(user, schoolId, allowStudentRole) {
++  if (!user || !user.id || !user.role) throw new Error('Unauthorized: verified user required');
++  if (user.role === 'super_admin') return true;
++  if (user.role === 'siswa' && !allowStudentRole) throw new Error('Forbidden: student role cannot manage student records');
++  var ids = studentSchoolIds_(user);
++  if (!schoolId || ids.indexOf(String(schoolId)) < 0) throw new Error('Forbidden: school access denied');
++  return true;
++}
++
++const Students = {
++  getStudents: function(params) {
++    try {
++      params = params || {};
++      const user = params.user;
++      let schoolId = params.schoolId;
++      if (!user || !user.id || !user.role) throw new Error('Unauthorized: verified user required');
++      if (user.role !== 'super_admin') {
++        const allowed = studentSchoolIds_(user);
++        if (!allowed.length) throw new Error('Forbidden: no school scope');
++        if (schoolId && allowed.indexOf(String(schoolId)) < 0) throw new Error('Forbidden: school access denied');
++        if (!schoolId) {
++          if (allowed.length !== 1) throw new Error('Forbidden: select one authorized school');
++          schoolId = allowed[0];
++        }
++        assertStudentSchoolAccess_(user, schoolId, false);
++      }
++      const { classId, search, status } = params;
++      let records = Database.getAll(CONFIG.SHEETS.STUDENTS);
++      if (schoolId) records = records.filter(r => String(r.schoolId) === String(schoolId));
++      if (classId) records = records.filter(r => String(r.classId) === String(classId));
++      if (status) records = records.filter(r => r.status === status);
++      if (search) {
++        const query = String(search).toLowerCase();
++        records = records.filter(r => String(r.name || '').toLowerCase().includes(query) || String(r.nis || '').includes(query) || String(r.nisn || '').includes(query));
++      }
++      return { success: true, data: records };
++    } catch (error) { return { success: false, error: error.toString() }; }
++  },
++  getStudent: function(studentId, user) {
++    try {
++      if (!user || !user.id || !user.role) throw new Error('Unauthorized: verified user required');
++      const student = Database.getById(CONFIG.SHEETS.STUDENTS, studentId);
++      if (!student) return { success: false, error: 'Student not found' };
++      if (user.role === 'siswa') throw new Error('Forbidden: student self-record mapping is not configured');
++      assertStudentSchoolAccess_(user, student.schoolId, false);
++      return { success: true, data: student };
++    } catch (error) { return { success: false, error: error.toString() }; }
++  },
++  createStudent: function(data) {
++    try {
++      data = data || {};
++      assertStudentSchoolAccess_(data.user, data.schoolId, false);
++      if (!data.nis || !data.name || !data.classId || !data.schoolId) return { success: false, error: 'Missing required fields' };
++      const cleanData = Object.assign({}, data); delete cleanData.user;
++      if (data.user.role !== 'super_admin') cleanData.schoolId = studentSchoolIds_(data.user)[0];
++      const existing = Database.getWhere(CONFIG.SHEETS.STUDENTS, { nis: cleanData.nis, schoolId: cleanData.schoolId });
++      if (existing.length > 0) return { success: false, error: 'NIS already exists' };
++      cleanData.status = cleanData.status || 'active';
++      return Database.create(CONFIG.SHEETS.STUDENTS, cleanData);
++    } catch (error) { return { success: false, error: error.toString() }; }
++  },
++  updateStudent: function(studentId, data) {
++    try {
++      data = data || {};
++      if (!data.user || !data.user.id || !data.user.role) throw new Error('Unauthorized: verified user required');
++      const existing = Database.getById(CONFIG.SHEETS.STUDENTS, studentId);
++      if (!existing) return { success: false, error: 'Student not found' };
++      assertStudentSchoolAccess_(data.user, existing.schoolId, false);
++      if (data.schoolId && String(data.schoolId) !== String(existing.schoolId) && data.user.role !== 'super_admin') throw new Error('Forbidden: cannot move student to another school');
++      const cleanData = Object.assign({}, data); delete cleanData.user; delete cleanData.studentId;
++      if (data.user.role !== 'super_admin') delete cleanData.schoolId;
++      return Database.update(CONFIG.SHEETS.STUDENTS, studentId, cleanData);
++    } catch (error) { return { success: false, error: error.toString() }; }
++  },
++  bulkImport: function(schoolId, students, user) {
++    try {
++      assertStudentSchoolAccess_(user, schoolId, false);
++      if (!Array.isArray(students)) return { success: false, error: 'students must be an array' };
++      const authorizedSchoolId = user.role === 'super_admin' ? String(schoolId) : studentSchoolIds_(user)[0];
++      const records = students.map(s => { const row = Object.assign({}, s, { schoolId: authorizedSchoolId }); delete row.user; return row; });
++      return Database.bulkCreate(CONFIG.SHEETS.STUDENTS, records);
++    } catch (error) { return { success: false, error: error.toString() }; }
++  }
++};
++
+--- a/backend-gas/Code.gs
++++ b/backend-gas/Code.gs
+@@ -59,7 +59,7 @@
+       case 'getStudent':
+-        result = Students.getStudent(params.studentId);
++        result = Students.getStudent(params.studentId, params.user);
+@@ -221,7 +221,7 @@
+       case 'bulkImportStudents':
+-        result = Students.bulkImport(payload.schoolId, payload.students);
++        result = Students.bulkImport(payload.schoolId, payload.students, user);

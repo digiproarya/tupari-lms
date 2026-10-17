@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('tupari_token');
       if (token) {
         // Notify backend tentang logout (fire-and-forget)
-        api.auth.logout(token).catch(() => {});
+        api.auth.logout().catch(() => {});
       }
     } catch (e) {
       // Ignore logout errors

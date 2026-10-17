@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { ClipboardList, Plus, Search, Clock, Users, Loader2, Database, Upload, X, FileText, Download, Eye } from 'lucide-react';
@@ -7,15 +8,32 @@ import { uploadFile, validateFile, formatFileSize } from '../utils/upload';
 
 export default function TugasPage() {
   const { user, hasPermission } = useAuth();
+  const [searchParams] = useSearchParams();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [studentProfile, setStudentProfile] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<string | null>(() => searchParams.get('assignmentId'));
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creatingAssignment, setCreatingAssignment] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    title: '',
+    description: '',
+    subjectId: '',
+    classId: '',
+    dueDate: '',
+    maxScore: '100',
+    status: 'draft' as 'draft' | 'active',
+    allowResubmit: false,
+  });
   const [submitting, setSubmitting] = useState(false);
+  const [gradingSubmissionId, setGradingSubmissionId] = useState<string | null>(null);
+  const [gradeDrafts, setGradeDrafts] = useState<Record<string, { score: string; feedback: string }>>({});
+  const [gradeNotice, setGradeNotice] = useState<string | null>(null);
   const [submitForm, setSubmitForm] = useState({
     content: '',
     file: null as File | null,
@@ -26,16 +44,34 @@ export default function TugasPage() {
       if (!user?.activeSchoolId) return;
       setLoading(true);
       try {
-        const [assignmentsData, subjectsData, classesData, studentsData] = await Promise.all([
+        const [assignmentsData, subjectsData, classesData] = await Promise.all([
           api.assignments.getAll(user.activeSchoolId) as Promise<Assignment[] | null>,
           api.subjects.getAll(user.activeSchoolId) as Promise<Subject[] | null>,
           api.classes.getAll(user.activeSchoolId) as Promise<Class[] | null>,
-          api.students.getAll(user.activeSchoolId) as Promise<Student[] | null>,
         ]);
         if (assignmentsData) setAssignments(assignmentsData);
         if (subjectsData) setSubjects(subjectsData);
         if (classesData) setClasses(classesData);
-        if (studentsData) setStudents(studentsData);
+
+        if (user.role === 'siswa') {
+          const studentsData = await api.students.getAll(user.activeSchoolId, { forceRefresh: true }) as Student[] | null;
+          const profile = (studentsData || []).find(student => {
+            const record = student as Student & { userId?: string; accountId?: string; email?: string };
+            return record.id === user.id || record.userId === user.id || record.accountId === user.id ||
+              (!!user.email && record.email?.toLowerCase() === user.email.toLowerCase());
+          });
+          if (profile?.classId && profile.schoolId === user.activeSchoolId) {
+            setStudentProfile(profile);
+            setAssignments((assignmentsData || []).filter(a => a.classId === profile.classId && a.status === 'active'));
+          } else {
+            setStudentProfile(null);
+            setAssignments([]);
+            alert('Akun siswa belum terhubung dengan data siswa/kelas. Hubungi administrator untuk memperbaiki pemetaan akun.');
+          }
+        } else {
+          const studentsData = await api.students.getAll(user.activeSchoolId) as Student[] | null;
+          if (studentsData) setStudents(studentsData);
+        }
       } catch (err) {
         console.error('Error:', err);
       } finally {
@@ -61,6 +97,56 @@ export default function TugasPage() {
     const submitted = assignment.submissions?.filter(s => s.status !== 'pending').length || 0;
     const graded = assignment.submissions?.filter(s => s.status === 'graded').length || 0;
     return { total, submitted, graded };
+  };
+
+  const handleCreateAssignment = async () => {
+    if (!user?.id || !createForm.title.trim() || !createForm.subjectId || !createForm.classId || !createForm.dueDate) {
+      alert('Lengkapi judul, mata pelajaran, kelas, dan tenggat tugas.');
+      return;
+    }
+    const maxScore = Number(createForm.maxScore);
+    if (!Number.isFinite(maxScore) || maxScore <= 0) {
+      alert('Nilai maksimum harus berupa angka lebih dari 0.');
+      return;
+    }
+    const targetClass = classes.find(c => c.id === createForm.classId);
+    if (!targetClass || targetClass.schoolId !== user.activeSchoolId) {
+      alert('Kelas tidak valid untuk sekolah aktif.');
+      return;
+    }
+
+    setCreatingAssignment(true);
+    try {
+      const response = await api.assignments.create({
+        title: createForm.title.trim(),
+        description: createForm.description.trim(),
+        subjectId: createForm.subjectId,
+        classId: createForm.classId,
+        teacherId: user.id,
+        schoolId: user.activeSchoolId,
+        dueDate: new Date(createForm.dueDate).toISOString(),
+        maxScore,
+        status: createForm.status,
+        allowResubmit: createForm.allowResubmit,
+        createdAt: new Date().toISOString(),
+      });
+
+      if (!response.success) {
+        alert('Gagal membuat tugas: ' + (response.error || 'Terjadi kesalahan.'));
+        return;
+      }
+
+      setShowCreateModal(false);
+      setCreateForm({ title: '', description: '', subjectId: '', classId: '', dueDate: '', maxScore: '100', status: 'draft', allowResubmit: false });
+      const refreshed = await api.assignments.getAll(user.activeSchoolId, { forceRefresh: true }) as Assignment[] | null;
+      if (refreshed) setAssignments(refreshed);
+      alert('Permintaan pembuatan tugas berhasil dikirim.');
+    } catch (error) {
+      console.error('Create assignment error:', error);
+      alert('Terjadi kesalahan saat membuat tugas.');
+    } finally {
+      setCreatingAssignment(false);
+    }
   };
 
   const handleSubmitTask = async () => {
@@ -97,7 +183,7 @@ export default function TugasPage() {
 
       const response = await api.submissions.submit(
         selectedAssignment,
-        user.id,
+        user.role === 'siswa' ? (studentProfile?.id || user.id) : user.id,
         submitForm.content,
         fileUrl
       );
@@ -110,8 +196,20 @@ export default function TugasPage() {
         
         // Refresh data
         if (user?.activeSchoolId) {
-          const assignmentsData = await api.assignments.getAll(user.activeSchoolId) as Assignment[] | null;
-          if (assignmentsData) setAssignments(assignmentsData);
+          const assignmentsData = await api.assignments.getAll(user.activeSchoolId, { forceRefresh: true }) as Assignment[] | null;
+          if (assignmentsData) {
+            // Keep the student view scoped to the linked class after submission too.
+            // A refresh must not replace the class-filtered list with every school assignment.
+            const visibleAssignments = user.role === 'siswa'
+              ? assignmentsData.filter(a =>
+                  a.classId === studentProfile?.classId &&
+                  a.status === 'active' &&
+                  (!(a as Assignment & { schoolId?: string }).schoolId ||
+                    (a as Assignment & { schoolId?: string }).schoolId === user.activeSchoolId)
+                )
+              : assignmentsData;
+            setAssignments(visibleAssignments);
+          }
         }
       } else {
         alert('Gagal mengumpulkan tugas: ' + (response.error || 'Unknown error'));
@@ -121,6 +219,70 @@ export default function TugasPage() {
       alert('Terjadi kesalahan saat mengumpulkan tugas');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleGradeSubmission = async (submissionId: string) => {
+    if (!user || !selected || !hasPermission('assignment.manage')) {
+      setGradeNotice('Akun ini tidak memiliki izin untuk menilai tugas.');
+      return;
+    }
+    const submission = selected.submissions?.find(item => item.id === submissionId);
+    if (!submission) {
+      setGradeNotice('Data pengumpulan tidak ditemukan. Muat ulang daftar tugas.');
+      return;
+    }
+    const draft = gradeDrafts[submissionId] || {
+      score: submission.score === undefined ? '' : String(submission.score),
+      feedback: submission.feedback || '',
+    };
+    const score = Number(draft.score);
+    if (draft.score.trim() === '' || !Number.isFinite(score) || score < 0 || score > Number(selected.maxScore)) {
+      setGradeNotice(`Nilai harus berupa angka antara 0 dan ${selected.maxScore}.`);
+      return;
+    }
+
+    setGradingSubmissionId(submissionId);
+    setGradeNotice(null);
+    try {
+      const response = await api.submissions.grade(submissionId, score, draft.feedback.trim());
+      if (!response?.success) {
+        setGradeNotice('Penilaian belum tersimpan: ' + (response?.error || 'backend tidak mengonfirmasi keberhasilan.'));
+        return;
+      }
+
+      const refreshed = user.activeSchoolId
+        ? await api.assignments.getAll(user.activeSchoolId, { forceRefresh: true }) as Assignment[] | null
+        : null;
+      if (!refreshed) {
+        setGradeNotice('Backend menerima permintaan penilaian, tetapi data terbaru belum dapat dimuat. Periksa kembali sebelum menilai ulang.');
+        return;
+      }
+      setAssignments(refreshed);
+      const persistedSubmission = refreshed
+        .find(assignment => assignment.id === selected.id)
+        ?.submissions?.find(item => item.id === submissionId);
+      const feedbackMatches = (persistedSubmission?.feedback || '') === draft.feedback.trim();
+      if (
+        !persistedSubmission ||
+        Number(persistedSubmission.score) !== score ||
+        !feedbackMatches ||
+        persistedSubmission.status !== 'graded'
+      ) {
+        setGradeNotice('Backend merespons berhasil, tetapi nilai/feedback belum terverifikasi pada data terbaru. Jangan kirim ulang berkali-kali; periksa handler GAS dan sheet SUBMISSIONS/GRADES.');
+        return;
+      }
+      setGradeDrafts(current => {
+        const next = { ...current };
+        delete next[submissionId];
+        return next;
+      });
+      setGradeNotice('Nilai dan umpan balik sudah ditemukan kembali pada data terbaru.');
+    } catch (error) {
+      console.error('Grade submission error:', error);
+      setGradeNotice('Penilaian gagal dipastikan tersimpan. Periksa koneksi dan muat ulang data sebelum mengirim ulang.');
+    } finally {
+      setGradingSubmissionId(null);
     }
   };
 
@@ -152,7 +314,7 @@ export default function TugasPage() {
           <p className="text-gray-500 dark:text-gray-400">Kelola tugas dan pantau pengumpulan siswa</p>
         </div>
         {hasPermission('assignment.manage') && (
-          <button className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+          <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
             <Plus size={18} /> Buat Tugas
           </button>
         )}
@@ -219,8 +381,7 @@ export default function TugasPage() {
                           <div className="h-full bg-green-500 rounded-full" style={{ width: `${stats.total > 0 ? (stats.submitted / stats.total) * 100 : 0}%` }} />
                         </div>
                         <p className="text-xs text-gray-500 mt-1">{stats.graded} dinilai</p>
-                      </div>
-                      <button onClick={() => setSelectedAssignment(assignment.id)}
+                      </div><button onClick={() => setSelectedAssignment(assignment.id)}
                         className="px-3 py-1.5 text-sm bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors">
                         Detail
                       </button>
@@ -262,16 +423,42 @@ export default function TugasPage() {
             </div>
             
             {/* Submit Button untuk Siswa */}
-            {user?.role === 'siswa' && selected.status === 'active' && (
-              <button 
-                onClick={() => setShowSubmitModal(true)}
-                className="mt-4 flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
-              >
-                <Upload size={18} /> Kumpulkan Tugas
-              </button>
-            )}
+            {user?.role === 'siswa' && selected.status === 'active' && (() => {
+              const ownSubmission = selected.submissions?.find(sub =>
+                sub.studentId === studentProfile?.id || sub.studentId === user.id
+              );
+              const mayResubmit = selected.allowResubmit === true;
+              if (ownSubmission && !mayResubmit) {
+                return <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">Tugas sudah dikumpulkan. Pengiriman ulang tidak diizinkan untuk tugas ini.</p>;
+              }
+              return (
+                <button
+                  onClick={() => setShowSubmitModal(true)}
+                  className="mt-4 flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                >
+                  <Upload size={18} /> {ownSubmission ? 'Kirim Ulang Tugas' : 'Kumpulkan Tugas'}
+                </button>
+              );
+            })()}
           </div>
 
+          {user?.role === 'siswa' ? (
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Status Pengumpulan Saya</h3>
+              {(() => {
+                const ownSubmission = selected.submissions?.find(sub => sub.studentId === studentProfile?.id || sub.studentId === user.id);
+                if (!ownSubmission) return <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada pengumpulan untuk tugas ini.</p>;
+                return (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Status: <strong>{ownSubmission.status === 'graded' ? 'Sudah dinilai' : ownSubmission.status === 'late' ? 'Terlambat' : ownSubmission.status === 'revised' ? 'Revisi dikirim' : 'Terkumpul'}</strong></p>
+                    {ownSubmission.submittedAt && <p className="text-sm text-gray-600 dark:text-gray-300">Waktu pengumpulan: {new Date(ownSubmission.submittedAt).toLocaleString('id-ID')}</p>}
+                    {ownSubmission.score !== undefined && <p className="text-sm font-semibold text-gray-900 dark:text-white">Nilai: {ownSubmission.score}/{selected.maxScore}</p>}
+                    {ownSubmission.feedback && <div className="mt-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3"><p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Umpan balik guru</p><p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{ownSubmission.feedback}</p></div>}
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900 dark:text-white">Pengumpulan Siswa</h3>
@@ -279,6 +466,11 @@ export default function TugasPage() {
                 <Download size={14} /> Ekspor
               </button>
             </div>
+            {gradeNotice && (
+              <div role="status" className="mx-4 mt-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-sm text-blue-800 dark:text-blue-200">
+                {gradeNotice}
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700/50">
@@ -312,18 +504,135 @@ export default function TugasPage() {
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                           {sub.score !== undefined ? `${sub.score}/${selected.maxScore}` : '—'}
                         </td>
-                        <td className="px-4 py-3">
-                          {sub.fileUrl && (
-                            <button className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-500">
-                              <Eye size={14} />
-                            </button>
-                          )}
+                        <td className="px-4 py-3 min-w-[260px]">
+                          <div className="flex flex-col gap-2">
+                            {sub.fileUrl && (
+                              <a href={sub.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                                <Eye size={14} /> Lihat lampiran
+                              </a>
+                            )}
+                            {hasPermission('assignment.manage') && sub.status !== 'pending' && (
+                              <>
+                                <label className="text-xs text-gray-500 dark:text-gray-400">
+                                  Nilai (maks. {selected.maxScore})
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={selected.maxScore}
+                                    step="any"
+                                    value={gradeDrafts[sub.id]?.score ?? (sub.score === undefined ? '' : String(sub.score))}
+                                    onChange={e => setGradeDrafts(current => ({
+                                      ...current,
+                                      [sub.id]: {
+                                        score: e.target.value,
+                                        feedback: current[sub.id]?.feedback ?? sub.feedback ?? '',
+                                      },
+                                    }))}
+                                    className="mt-1 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-sm text-gray-900 dark:text-white"
+                                    aria-label={`Nilai untuk ${student?.name || 'siswa'}`}
+                                  />
+                                </label>
+                                <label className="text-xs text-gray-500 dark:text-gray-400">
+                                  Umpan balik
+                                  <textarea
+                                    rows={2}
+                                    value={gradeDrafts[sub.id]?.feedback ?? sub.feedback ?? ''}
+                                    onChange={e => setGradeDrafts(current => ({
+                                      ...current,
+                                      [sub.id]: {
+                                        score: current[sub.id]?.score ?? (sub.score === undefined ? '' : String(sub.score)),
+                                        feedback: e.target.value,
+                                      },
+                                    }))}
+                                    className="mt-1 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-sm text-gray-900 dark:text-white"
+                                    aria-label={`Umpan balik untuk ${student?.name || 'siswa'}`}
+                                  />
+                                </label>
+                                <button
+                                  onClick={() => handleGradeSubmission(sub.id)}
+                                  disabled={gradingSubmissionId !== null}
+                                  className="inline-flex items-center justify-center gap-1 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                                >
+                                  {gradingSubmissionId === sub.id ? <><Loader2 size={13} className="animate-spin" /> Menyimpan...</> : 'Simpan penilaian'}
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+      )}
+        </div>
+      )}
+
+      {/* Create Assignment Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Buat Tugas</h2>
+              <button onClick={() => setShowCreateModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" aria-label="Tutup">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Judul Tugas *</label>
+                <input value={createForm.title} onChange={e => setCreateForm({ ...createForm, title: e.target.value })} maxLength={180} placeholder="Contoh: Latihan Bab 1" className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deskripsi / Instruksi</label>
+                <textarea value={createForm.description} onChange={e => setCreateForm({ ...createForm, description: e.target.value })} rows={4} placeholder="Tuliskan petunjuk pengerjaan tugas" className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-y" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mata Pelajaran *</label>
+                  <select value={createForm.subjectId} onChange={e => setCreateForm({ ...createForm, subjectId: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="">Pilih mata pelajaran</option>
+                    {subjects.filter(subject => subject.schoolId === user?.activeSchoolId).map(subject => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Kelas *</label>
+                  <select value={createForm.classId} onChange={e => setCreateForm({ ...createForm, classId: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="">Pilih kelas</option>
+                    {classes.filter(cls => cls.schoolId === user?.activeSchoolId).map(cls => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tenggat *</label>
+                  <input type="datetime-local" value={createForm.dueDate} onChange={e => setCreateForm({ ...createForm, dueDate: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nilai Maksimum</label>
+                  <input type="number" min="1" max="1000" value={createForm.maxScore} onChange={e => setCreateForm({ ...createForm, maxScore: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input type="checkbox" checked={createForm.allowResubmit} onChange={e => setCreateForm({ ...createForm, allowResubmit: e.target.checked })} className="rounded border-gray-300" />
+                  Izinkan siswa mengirim ulang
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <span>Status</span>
+                  <select value={createForm.status} onChange={e => setCreateForm({ ...createForm, status: e.target.value as 'draft' | 'active' })} className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="draft">Draft</option>
+                    <option value="active">Aktif</option>
+                  </select>
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Tugas disimpan pada backend Tupari LMS yang sudah dikonfigurasi. Pastikan fungsi backend createAssignment mendukung field di atas sebelum digunakan pada data nyata.</p>
+            </div>
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex gap-3 justify-end">
+              <button onClick={() => setShowCreateModal(false)} disabled={creatingAssignment} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">Batal</button>
+              <button onClick={handleCreateAssignment} disabled={creatingAssignment} className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg disabled:opacity-50">
+                {creatingAssignment ? <><Loader2 size={16} className="animate-spin" /> Menyimpan...</> : <><Plus size={16} /> Simpan Tugas</>}
+              </button>
             </div>
           </div>
         </div>
