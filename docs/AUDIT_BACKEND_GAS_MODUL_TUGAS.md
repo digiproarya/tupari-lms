@@ -156,3 +156,19 @@ Dampak:
 2. Tidak ada perubahan UI penilaian yang dibuat pada putaran ini karena endpoint `gradeSubmission` belum dapat diverifikasi terhadap handler aktif dan skema sheet.
 3. Perubahan berikutnya harus dilakukan pada sumber backend GAS yang memang aktif, setelah source-nya tersedia. Setelah handler tervalidasi, perubahan frontend bisa dilakukan di branch ini secara terpisah.
 4. PR tetap draft dan belum digabung; jangan menganggap pemeriksaan kode sumber sebagai bukti pengujian runtime.
+
+
+## Perubahan frontend penilaian — 17 Oktober 2026
+
+Perubahan terbatas dibuat pada `src/pages/TugasPage.tsx` di branch pengembangan:
+
+- Menambahkan input nilai dan umpan balik pada baris pengumpulan siswa untuk pengguna yang memiliki izin `assignment.manage`.
+- Memvalidasi nilai wajib numerik dalam rentang 0 sampai `maxScore` sebelum mengirim permintaan.
+- Menghubungkan tombol simpan ke helper API yang sudah ada, `api.submissions.grade(submissionId, score, feedback)`.
+- Menambahkan status proses, pesan kegagalan, dan pemuatan ulang data sesudah respons sukses.
+- Sesudah pemuatan ulang, frontend memeriksa apakah nilai, feedback, dan status `graded` ditemukan kembali di data tugas. Jika tidak cocok, UI memberi peringatan bahwa persistensi belum terverifikasi, bukan menyatakan penilaian selesai.
+- Tautan lampiran kini memakai URL langsung dengan `target="_blank"` dan `rel="noreferrer"`.
+
+### Batas verifikasi
+
+Ini adalah perubahan frontend, bukan perbaikan handler GAS. Pemeriksaan data setelah refresh hanya dapat membuktikan persistensi jika endpoint `getAssignments` benar-benar mengembalikan submission terbaru. Source GAS aktif, otorisasi server, pemetaan header sheet, dan perilaku runtime masih belum dapat diverifikasi dari repo ini. Belum ada hasil `npm run build`, `npm run typecheck`, atau end-to-end test yang dapat diklaim lulus. PR tetap tidak boleh digabung ke `main` sebelum pemeriksaan tersebut.
