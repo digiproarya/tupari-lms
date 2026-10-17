@@ -132,3 +132,16 @@ Ini **belum membuktikan** bahwa handler tidak memiliki pemeriksaan internal—so
 - Router yang ditemukan adalah salinan teks dari percakapan, bukan bukti bahwa isinya sama dengan versi GAS aktif.
 - Source lengkap `UploadHandler`, `Assignments`, `Database`, konfigurasi sheet, serta header `SUBMISSIONS/GRADES/ASSIGNMENTS` belum ditemukan pada repo GitHub atau hasil pencarian file yang relevan.
 - Tidak ada perubahan backend GAS dilakukan berdasarkan router saja. Langkah aman berikutnya tetap membandingkan salinan ini dengan kode aktif di Apps Script, kemudian membaca handler dan header yang benar sebelum membuat patch.
+
+
+## Pemeriksaan frontend/API tambahan — 17 Oktober 2026
+
+- `api.assignments.getAll(schoolId, options)` memang mengirim `{ schoolId }` ke action `getAssignments` dan menggunakan cache key `assignments_school_<schoolId>`. Jadi pemanggilan frontend ini bukan salah posisi argumen.
+- `api.assignments.create(data)` menghapus cache sekolah terkait setelah pembuatan tugas berhasil.
+- `api.submissions.grade(submissionId, score, feedback)` tersedia sebagai helper di API, tetapi pencarian langsung pada `src/pages/TugasPage.tsx` tidak menemukan pemanggilan `api.submissions.grade`, `gradeSubmission`, atau handler penilaian. Form/aksi penilaian guru belum tersambung pada halaman Tugas yang diperiksa.
+- `src/pages/TugasPage.tsx` memiliki state untuk membuka modal pengumpulan dan pembuatan tugas; belum ditemukan state/handler penilaian pada file itu.
+- `vercel.json` dan `vite.config.ts` tidak ditemukan pada root branch yang diperiksa. Ini belum menjelaskan kegagalan Vercel; tanpa log build, penyebabnya belum dapat dipastikan. `tsconfig.json` menggunakan strict mode dan `package.json` menyediakan skrip `build` dan `typecheck`, tetapi build tidak dapat dijalankan dari konektor GitHub saja.
+
+### Keputusan berikutnya
+
+Tidak mengubah kontrak `getAll(schoolId)` karena sudah cocok dengan helper API. Fokus berikutnya adalah mengaudit sumber GAS yang benar-benar aktif, terutama handler persistensi dan header sheet, kemudian membuat satu perubahan kecil yang bisa diuji: penyimpanan nilai/feedback dari halaman Tugas, validasi rentang nilai terhadap `maxScore`, status error/berhasil, dan pembacaan ulang setelah menyimpan. Jangan menyatakan build/deployment lulus sebelum ada hasil build atau log yang dapat diperiksa.
