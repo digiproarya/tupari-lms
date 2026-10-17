@@ -13,6 +13,7 @@ export default function TugasPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [studentProfile, setStudentProfile] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(() => searchParams.get('assignmentId'));
@@ -40,16 +41,31 @@ export default function TugasPage() {
       if (!user?.activeSchoolId) return;
       setLoading(true);
       try {
-        const [assignmentsData, subjectsData, classesData, studentsData] = await Promise.all([
+        const [assignmentsData, subjectsData, classesData] = await Promise.all([
           api.assignments.getAll(user.activeSchoolId) as Promise<Assignment[] | null>,
           api.subjects.getAll(user.activeSchoolId) as Promise<Subject[] | null>,
           api.classes.getAll(user.activeSchoolId) as Promise<Class[] | null>,
-          api.students.getAll(user.activeSchoolId) as Promise<Student[] | null>,
         ]);
         if (assignmentsData) setAssignments(assignmentsData);
         if (subjectsData) setSubjects(subjectsData);
         if (classesData) setClasses(classesData);
-        if (studentsData) setStudents(studentsData);
+
+        if (user.role === 'siswa') {
+          const profileResult = await api.students.getById(user.id) as any;
+          const profile = profileResult && typeof profileResult === 'object' && 'data' in profileResult
+            ? profileResult.data as Student
+            : profileResult as Student | null;
+          if (profile?.classId && profile.schoolId === user.activeSchoolId) {
+            setStudentProfile(profile);
+            setAssignments((assignmentsData || []).filter(a => a.classId === profile.classId && a.schoolId === user.activeSchoolId && a.status === 'active'));
+          } else {
+            setStudentProfile(null);
+            setAssignments([]);
+          }
+        } else {
+          const studentsData = await api.students.getAll(user.activeSchoolId) as Student[] | null;
+          if (studentsData) setStudents(studentsData);
+        }
       } catch (err) {
         console.error('Error:', err);
       } finally {
@@ -335,6 +351,23 @@ export default function TugasPage() {
             )}
           </div>
 
+          {user?.role === 'siswa' ? (
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Status Pengumpulan Saya</h3>
+              {(() => {
+                const ownSubmission = selected.submissions?.find(sub => sub.studentId === studentProfile?.id || sub.studentId === user.id);
+                if (!ownSubmission) return <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada pengumpulan untuk tugas ini.</p>;
+                return (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Status: <strong>{ownSubmission.status === 'graded' ? 'Sudah dinilai' : ownSubmission.status === 'late' ? 'Terlambat' : ownSubmission.status === 'revised' ? 'Revisi dikirim' : 'Terkumpul'}</strong></p>
+                    {ownSubmission.submittedAt && <p className="text-sm text-gray-600 dark:text-gray-300">Waktu pengumpulan: {new Date(ownSubmission.submittedAt).toLocaleString('id-ID')}</p>}
+                    {ownSubmission.score !== undefined && <p className="text-sm font-semibold text-gray-900 dark:text-white">Nilai: {ownSubmission.score}/{selected.maxScore}</p>}
+                    {ownSubmission.feedback && <div className="mt-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3"><p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Umpan balik guru</p><p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{ownSubmission.feedback}</p></div>}
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900 dark:text-white">Pengumpulan Siswa</h3>
@@ -543,6 +576,9 @@ export default function TugasPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}          )}
     </div>
   );
 }
