@@ -13,6 +13,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import {
@@ -26,6 +27,7 @@ type StudentTab = 'home' | 'materi' | 'tugas' | 'nilai' | 'presensi' | 'ujian' |
 
 export default function StudentPortalPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<StudentTab>('home');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -326,7 +328,10 @@ export default function StudentPortalPage() {
                       Tenggat: {new Date(a.dueDate).toLocaleDateString('id-ID')}
                     </span>
                     {a.status === 'active' && !isSubmitted && (
-                      <button className="px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
+                      <button
+                        onClick={() => navigate(`/tugas?assignmentId=${encodeURIComponent(a.id)}`)}
+                        className="px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg"
+                      >
                         Kumpulkan
                       </button>
                     )}
