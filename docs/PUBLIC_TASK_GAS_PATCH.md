@@ -1,3 +1,5 @@
+> **DEPRECATED — JANGAN DIPASANG.** Arah halaman tugas publik terpisah sudah dibatalkan. Keputusan final: EduTask dipindahkan menjadi fitur native pada menu Tugas Tupari LMS, memakai autentikasi dan spreadsheet yang sudah ada. Dokumen ini hanya arsip historis; jangan menyalin patch ini ke GAS produksi.
+
 # Patch Google Apps Script: tugas tanpa login siswa
 
 Tanggal: 2026-10-16  
