@@ -193,8 +193,20 @@ export default function TugasPage() {
         
         // Refresh data
         if (user?.activeSchoolId) {
-          const assignmentsData = await api.assignments.getAll(user.activeSchoolId) as Assignment[] | null;
-          if (assignmentsData) setAssignments(assignmentsData);
+          const assignmentsData = await api.assignments.getAll(user.activeSchoolId, { forceRefresh: true }) as Assignment[] | null;
+          if (assignmentsData) {
+            // Keep the student view scoped to the linked class after submission too.
+            // A refresh must not replace the class-filtered list with every school assignment.
+            const visibleAssignments = user.role === 'siswa'
+              ? assignmentsData.filter(a =>
+                  a.classId === studentProfile?.classId &&
+                  a.status === 'active' &&
+                  (!(a as Assignment & { schoolId?: string }).schoolId ||
+                    (a as Assignment & { schoolId?: string }).schoolId === user.activeSchoolId)
+                )
+              : assignmentsData;
+            setAssignments(visibleAssignments);
+          }
         }
       } else {
         alert('Gagal mengumpulkan tugas: ' + (response.error || 'Unknown error'));
