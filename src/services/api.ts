@@ -12,7 +12,7 @@ import { db } from './db';
 
 // ==================== CONFIG ====================
 const CONFIG = {
-  GAS_URL: (import.meta as any).env?.VITE_GAS_URL || 'https://script.google.com/macros/s/AKfycbx9Uhi7GFtdWSFUwAGZIq7k1XflvcC0b1GeVus9m0n6vlKH5-1PPlTQKJ3k9ilLcxNvOg/exec',
+  get GAS_URL() { const saved=typeof localStorage!=='undefined'?localStorage.getItem('tupari_gas_url'):null; return saved||(import.meta as any).env?.VITE_GAS_URL||'https://script.google.com/macros/s/AKfycbx9Uhi7GFtdWSFUwAGZIq7k1XflvcC0b1GeVus9m0n6vlKH5-1PPlTQKJ3k9ilLcxNvOg/exec'; },
   CACHE_TTL: {
     students: 5 * 60 * 1000,
     classes: 30 * 60 * 1000,
@@ -671,9 +671,8 @@ export const api = {
   },
 
   // ---------- CONFIG ----------
-  getConfig: () => {
-    return CONFIG;
-  },
+  getConfig: () => CONFIG,
+  config: { getBackendUrl: () => CONFIG.GAS_URL, setBackendUrl: (url: string) => { const parsed=new URL(url); if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('google.com')||!parsed.pathname.includes('/macros/s/')) throw new Error('URL Web App Google Apps Script tidak valid.'); localStorage.setItem('tupari_gas_url',parsed.toString()); return parsed.toString(); }, clearBackendUrl:()=>localStorage.removeItem('tupari_gas_url'), testConnection:async()=>fetchWithRetry('health',{}, {priority:'high',timeout:15000}) },
 };
 
 // ==================== BACKGROUND SYNC ====================
