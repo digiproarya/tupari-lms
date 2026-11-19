@@ -1,0 +1,23 @@
+<!-- Tombol portal TuPARI: guru diarahkan ke frontend pusat dengan URL backend sekolah -->
+<section class="tupari-replikasi">
+  <h2>Buat LMS Sekolah Anda</h2>
+  <p>TuPARI membantu sekolah membuat ruang belajar digital. Backend dan database dibuat di akun Google sekolah Anda.</p>
+  <a id="buat-lms" href="#" class="tupari-btn">Buat LMS Saya</a>
+  <small>Anda akan mengikuti panduan instalasi dan menggunakan akun Google sendiri.</small>
+</section>
+<script>
+(function(){
+  const FRONTEND_URL = "https://URL-FRONTEND-TUPARI/";
+  const GAS_WEB_APP_URL = ""; // isi URL deployment GAS sekolah jika sudah tersedia
+  const button = document.getElementById("buat-lms");
+  button.href = GAS_WEB_APP_URL
+    ? FRONTEND_URL + "?gas=" + encodeURIComponent(GAS_WEB_APP_URL)
+    : FRONTEND_URL;
+})();
+</script>
+<style>
+.tupari-replikasi{max-width:760px;margin:24px auto;padding:28px;border:1px solid #d9e2ec;border-radius:18px;font-family:system-ui}
+.tupari-replikasi h2{margin:0 0 10px}.tupari-replikasi p{line-height:1.6}
+.tupari-btn{display:inline-block;background:#1456a0;color:#fff;padding:13px 20px;border-radius:10px;text-decoration:none;font-weight:700}
+.tupari-replikasi small{display:block;margin-top:12px;color:#536273}
+</style>
