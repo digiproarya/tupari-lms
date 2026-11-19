@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [gasUrl, setGasUrl] = useState(() => localStorage.getItem('tupari_gas_url') || (import.meta as any).env?.VITE_GAS_URL || '');
+  const [gasUrl, setGasUrl] = useState(() => { const fromPortal=new URLSearchParams(window.location.search).get('gas'); if(fromPortal){ try{const u=new URL(fromPortal);if(u.protocol==='https:'&&u.hostname.endsWith('google.com')&&u.pathname.includes('/macros/s/')){localStorage.setItem('tupari_gas_url',u.toString());return u.toString();}}catch{} } return localStorage.getItem('tupari_gas_url') || (import.meta as any).env?.VITE_GAS_URL || ''; });
   const [checking, setChecking] = useState(false);
   const [connectionMessage, setConnectionMessage] = useState('');
 
