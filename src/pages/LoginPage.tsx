@@ -11,7 +11,15 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [gasUrl, setGasUrl] = useState(() => { const fromPortal=new URLSearchParams(window.location.search).get('gas'); if(fromPortal){ try{const u=new URL(fromPortal);if(u.protocol==='https:'&&u.hostname.endsWith('google.com')&&u.pathname.includes('/macros/s/')){localStorage.setItem('tupari_gas_url',u.toString());return u.toString();}}catch{} } return localStorage.getItem('tupari_gas_url') || (import.meta as any).env?.VITE_GAS_URL || ''; });
+  const isValidGasUrl = (value: string) => {
+    try { const u = new URL(value); return u.protocol === 'https:' && u.hostname === 'script.google.com' && /^\\/macros\\/s\\/[^/]+\\/exec$/.test(u.pathname); }
+    catch { return false; }
+  };
+  const [gasUrl, setGasUrl] = useState(() => {
+    const fromPortal = new URLSearchParams(window.location.search).get('gas');
+    if (fromPortal && isValidGasUrl(fromPortal)) { localStorage.setItem('tupari_gas_url', fromPortal); return fromPortal; }
+    return localStorage.getItem('tupari_gas_url') || (import.meta as any).env?.VITE_GAS_URL || '';
+  });
   const [checking, setChecking] = useState(false);
   const [connectionMessage, setConnectionMessage] = useState('');
 
@@ -25,7 +33,8 @@ export default function LoginPage() {
     }
 
     if (!gasUrl.trim()) { setError('Alamat LMS (Google Apps Script Web App) wajib diisi.'); return; }
-    try { const parsed=new URL(gasUrl.trim()); if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('google.com')||!parsed.pathname.includes('/macros/s/')) {setError('Alamat harus berupa URL Web App Google Apps Script.');return;} localStorage.setItem('tupari_gas_url',parsed.toString()); } catch {setError('URL LMS tidak valid.');return;}
+    if (!isValidGasUrl(gasUrl.trim())) { setError('Alamat harus berupa URL Web App Google Apps Script yang valid.'); return; }
+    localStorage.setItem('tupari_gas_url', gasUrl.trim());
     setLoading(true);
     try {
       const result = await login(email, password);
@@ -68,7 +77,7 @@ export default function LoginPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Alamat LMS / Backend (Google Apps Script)</label>
               <input type="url" value={gasUrl} onChange={e=>{setGasUrl(e.target.value);setConnectionMessage('');}} placeholder="https://script.google.com/macros/s/.../exec" className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all" required />
-              <button type="button" disabled={checking||!gasUrl.trim()} onClick={async()=>{setChecking(true);setConnectionMessage('');try{const u=new URL(gasUrl.trim());if(u.protocol!=='https:'||!u.hostname.endsWith('google.com')||!u.pathname.includes('/macros/s/'))throw new Error('URL bukan Web App Google Apps Script.');localStorage.setItem('tupari_gas_url',u.toString());const res=await fetch(u.toString()+(u.search?'&':'?')+'action=health');const data=await res.json();setConnectionMessage(data?.success?'✓ Backend terhubung.':'Backend merespons, health check gagal.');}catch(err){setConnectionMessage(err instanceof Error?err.message:'Koneksi gagal. Periksa URL dan deployment.');}finally{setChecking(false);}}} className="mt-2 text-xs text-primary-600 hover:underline disabled:opacity-50">{checking?'Memeriksa koneksi…':'Tes koneksi LMS'}</button>
+              <button type="button" disabled={checking||!gasUrl.trim()} onClick={async()=>{setChecking(true);setConnectionMessage('');try{if(!isValidGasUrl(gasUrl.trim()))throw new Error('URL bukan Web App Google Apps Script yang valid.');localStorage.setItem('tupari_gas_url',gasUrl.trim());const u=new URL(gasUrl.trim());const res=await fetch(u.toString()+(u.search?'&':'?')+'action=health');const data=await res.json();setConnectionMessage(data?.success?'✓ Backend terhubung.':'Backend merespons, health check gagal.');}catch(err){setConnectionMessage(err instanceof Error?err.message:'Koneksi gagal. Periksa URL dan deployment.');}finally{setChecking(false);}}} className="mt-2 text-xs text-primary-600 hover:underline disabled:opacity-50">{checking?'Memeriksa koneksi…':'Tes koneksi LMS'}</button>
               {connectionMessage&&<p className="text-xs mt-1 text-gray-600 dark:text-gray-300">{connectionMessage}</p>}
             </div>
             <div>
